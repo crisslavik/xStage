@@ -1,0 +1,18 @@
+# USD Viewer Requirements for RHEL9/AlmaLinux
+
+# Core USD support
+usd-core>=23.11
+
+# Qt GUI framework
+PySide6>=6.6.0
+PySide6-Addons>=6.6.0
+
+# OpenGL support
+PyOpenGL>=3.1.7
+PyOpenGL-accelerate>=3.1.7
+
+# Numerical computing
+numpy>=1.24.0
+
+# Optional format support
+pygltflib>=1.16.0  # For glTF/GLB import
