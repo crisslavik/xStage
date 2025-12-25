@@ -85,4 +85,7 @@ __all__ = [
     "PerformanceProfiler",
     "HelpSystem",
     "ProgressReporter",
+    # OpenExec
+    "OpenExecManager",
+    "OpenExecWidget",
 ]
