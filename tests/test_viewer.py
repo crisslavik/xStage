@@ -35,7 +35,7 @@ def test_usd_stage_manager():
     """Test USDStageManager functionality"""
     pytest.importorskip("pxr")
     
-    from usd_viewer import USDStageManager
+    from viewer import USDStageManager
     
     manager = USDStageManager()
     assert manager.stage is None
@@ -45,7 +45,7 @@ def test_usd_stage_manager():
 
 def test_conversion_options():
     """Test ConversionOptions dataclass"""
-    from converter_dialog import ConversionOptions
+    from converter import ConversionOptions
     
     opts = ConversionOptions()
     assert opts.output_format == "usdc"
@@ -68,7 +68,7 @@ def test_obj_conversion(tmp_path):
     """Test OBJ to USD conversion"""
     pytest.importorskip("pxr")
     
-    from converter_dialog import USDConverter, ConversionOptions
+    from converter import USDConverter, ConversionOptions
     from pxr import Usd, UsdGeom
     
     # Create simple OBJ file
@@ -109,7 +109,7 @@ def test_stl_conversion(tmp_path):
     """Test STL to USD conversion"""
     pytest.importorskip("pxr")
     
-    from converter_dialog import USDConverter, ConversionOptions
+    from converter import USDConverter, ConversionOptions
     from pxr import Usd
     import struct
     
@@ -151,7 +151,7 @@ def test_stl_conversion(tmp_path):
 
 def test_viewer_settings():
     """Test ViewerSettings dataclass"""
-    from usd_viewer import ViewerSettings
+    from viewer import ViewerSettings
     
     settings = ViewerSettings()
     assert settings.background_color == (0.2, 0.2, 0.2, 1.0)
@@ -165,7 +165,7 @@ def test_viewer_settings():
 def test_viewport_creation():
     """Test viewport widget creation"""
     from PySide6.QtWidgets import QApplication
-    from usd_viewer import ViewportWidget
+    from viewer import ViewportWidget
     
     app = QApplication.instance() or QApplication(sys.argv)
     
@@ -184,7 +184,7 @@ def test_mesh_extraction():
     pytest.importorskip("pxr")
     
     from pxr import Usd, UsdGeom, Gf
-    from usd_viewer import USDStageManager
+    from viewer import USDStageManager
     import tempfile
     
     # Create temporary USD file with mesh
@@ -226,7 +226,7 @@ def test_bounds_calculation():
     """Test scene bounds calculation"""
     pytest.importorskip("pxr")
     
-    from usd_viewer import USDStageManager
+    from viewer import USDStageManager
     import numpy as np
     
     manager = USDStageManager()
@@ -257,7 +257,7 @@ def test_ply_parsing():
     """Test PLY file parsing"""
     pytest.importorskip("pxr")
     
-    from converter_dialog import USDConverter, ConversionOptions
+    from converter import USDConverter, ConversionOptions
     from pathlib import Path
     import tempfile
     

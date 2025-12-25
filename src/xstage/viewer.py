@@ -747,7 +747,7 @@ class USDViewerWindow(QMainWindow):
         
     def import_convert_file(self):
         """Import and convert 3D file to USD"""
-        from converter_dialog import ConverterDialog
+        from converter import ConverterDialog
         dialog = ConverterDialog(self)
         if dialog.exec():
             output_path = dialog.get_output_path()

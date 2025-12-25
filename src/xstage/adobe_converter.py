@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, Dict, List
 from dataclasses import dataclass
 
-from converter_dialog import ConversionOptions, USDConverter as BaseConverter
+from converter import ConversionOptions, USDConverter as BaseConverter
 
 try:
     from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, UsdUtils
