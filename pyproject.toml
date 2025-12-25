@@ -28,7 +28,7 @@ Repository = "https://github.com/xstage-pipeline/xstage"
 Issues = "https://github.com/xstage-pipeline/xstage/issues"
 
 [project.scripts]
-xstage = "xstage.viewer:main"
+xstage = "xstage.core.viewer:main"
 
 [tool.black]
 line-length = 100

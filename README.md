@@ -163,7 +163,9 @@ xstage import.obj --scale 0.001 --up-axis Z --flip-z
 ### Python API
 
 ```python
-from xstage import USDViewerWindow
+from xstage.core.viewer import USDViewerWindow
+# Or use the convenience import:
+# from xstage import USDViewerWindow
 
 # Create viewer
 viewer = USDViewerWindow()

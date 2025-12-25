@@ -38,7 +38,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "xstage=xstage.viewer:main",
+            "xstage=xstage.core.viewer:main",
         ],
     },
 )
