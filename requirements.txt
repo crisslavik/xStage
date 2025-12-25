@@ -16,3 +16,6 @@ numpy>=1.24.0
 
 # Optional format support
 pygltflib>=1.16.0  # For glTF/GLB import
+
+# Note: All USD features (UsdLux, UsdShade, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils)
+# are included in usd-core package. No additional dependencies required for the new features.
