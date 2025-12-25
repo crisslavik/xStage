@@ -867,6 +867,7 @@ class USDViewerWindow(QMainWindow):
         self.stage_variables_widget = None
         self.multi_viewport_widget = None
         self.scene_comparison_widget = None
+        self.openexec_widget = None
         self.prim_selection_manager = None
         self.undo_redo_manager = None
         self.help_system = None
@@ -1022,6 +1023,10 @@ class USDViewerWindow(QMainWindow):
         stage_variables_action = QAction("&Stage Variables...", self)
         stage_variables_action.triggered.connect(self.show_stage_variables)
         tools_menu.addAction(stage_variables_action)
+        
+        openexec_action = QAction("&OpenExec (Computed Attributes)...", self)
+        openexec_action.triggered.connect(self.show_openexec)
+        tools_menu.addAction(openexec_action)
         
         tools_menu.addSeparator()
         
@@ -1258,6 +1263,8 @@ class USDViewerWindow(QMainWindow):
                 self.render_settings_editor_widget.set_stage(self.stage_manager.stage)
             if self.stage_variables_widget:
                 self.stage_variables_widget.set_stage(self.stage_manager.stage)
+            if self.openexec_widget:
+                self.openexec_widget.set_stage(self.stage_manager.stage)
             if self.multi_viewport_widget:
                 self.multi_viewport_widget.set_stage_manager(self.stage_manager)
             
@@ -1766,6 +1773,23 @@ class USDViewerWindow(QMainWindow):
         from .help_system import HelpDialog
         help_dialog = HelpDialog(self)
         help_dialog.exec()
+    
+    def show_openexec(self):
+        """Show OpenExec dock"""
+        if not self.openexec_widget:
+            from .openexec_ui import OpenExecWidget
+            self.openexec_widget = OpenExecWidget()
+            dock = QDockWidget("OpenExec - Computed Attributes", self)
+            dock.setWidget(self.openexec_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.openexec_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.openexec_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
     
     def show_about(self):
         """Show about dialog"""

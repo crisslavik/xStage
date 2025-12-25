@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from typing import Optional, List
-from pxr import Gf
+from pxr import Gf, UsdGeom
 
 from .prim_selection import PrimSelectionManager
 
@@ -158,14 +158,54 @@ class PrimPropertiesWidget(QWidget):
             self.scale_y_spin.setValue(scale[1])
             self.scale_z_spin.setValue(scale[2])
         
-        # Display attributes
+        # Display attributes (including computed)
         attrs_text = "Attributes:\n"
-        for attr in prim.GetAttributes():
-            try:
-                value = attr.Get()
-                attrs_text += f"\n{attr.GetName()}: {value} ({attr.GetTypeName()})"
-            except:
-                pass
+        
+        # Check for OpenExec support
+        try:
+            from .openexec_support import OpenExecManager
+            if self.selection_manager and self.selection_manager.stage:
+                openexec_mgr = OpenExecManager(self.selection_manager.stage)
+                
+                # Get computed attributes
+                computed_attrs = openexec_mgr.get_all_computed_attributes(prim)
+                
+                for attr in prim.GetAttributes():
+                    try:
+                        attr_name = attr.GetName()
+                        is_computed = attr_name in computed_attrs
+                        
+                        if is_computed:
+                            # Get computed value
+                            computed_value = openexec_mgr.get_computed_value(prim, attr_name)
+                            if computed_value is not None:
+                                attrs_text += f"\n{attr_name}: {computed_value} ({attr.GetTypeName()}) [COMPUTED]"
+                            else:
+                                attrs_text += f"\n{attr_name}: (computed, not evaluated) ({attr.GetTypeName()}) [COMPUTED]"
+                        else:
+                            # Regular authored attribute
+                            if attr.HasAuthoredValue():
+                                value = attr.Get()
+                                attrs_text += f"\n{attr_name}: {value} ({attr.GetTypeName()})"
+                    except:
+                        pass
+                
+                # Show extent if it can be computed
+                if prim.IsA(UsdGeom.Boundable):
+                    extent_attr = prim.GetAttribute("extent")
+                    if extent_attr and not extent_attr.HasAuthoredValue():
+                        computed_extent = openexec_mgr.compute_extent(prim)
+                        if computed_extent:
+                            attrs_text += f"\nextent: {computed_extent} (double2[]) [COMPUTED]"
+        except ImportError:
+            # Fallback to regular attribute display
+            for attr in prim.GetAttributes():
+                try:
+                    if attr.HasAuthoredValue():
+                        value = attr.Get()
+                        attrs_text += f"\n{attr.GetName()}: {value} ({attr.GetTypeName()})"
+                except:
+                    pass
         
         self.attributes_text.setText(attrs_text)
     
