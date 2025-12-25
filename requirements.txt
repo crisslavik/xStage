@@ -16,6 +16,13 @@ numpy>=1.24.0
 
 # Optional format support
 pygltflib>=1.16.0  # For glTF/GLB import
+trimesh>=3.15.0  # For OBJ, STL, PLY, and other mesh format conversion
 
 # Note: All USD features (UsdLux, UsdShade, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils)
 # are included in usd-core package. No additional dependencies required for the new features.
+
+# Converter dependencies (optional, for format support):
+# - FBX: Requires USD FBX plugin or fbx2usd CLI tool
+# - Alembic: Requires USD Alembic plugin (usually included with USD)
+# - glTF: Requires pygltflib (listed above)
+# - OBJ/STL/PLY: Requires trimesh (listed above)

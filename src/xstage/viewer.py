@@ -852,6 +852,29 @@ class USDViewerWindow(QMainWindow):
         self.playback_timer = QTimer()
         self.playback_timer.timeout.connect(self.advance_frame)
         self.payload_manager = None
+        self.use_hydra = False
+        
+        # Feature widgets
+        self.layer_composition_widget = None
+        self.animation_editor_widget = None
+        self.material_editor_widget = None
+        self.scene_search_widget = None
+        self.camera_manager_widget = None
+        self.prim_properties_widget = None
+        self.collection_editor_widget = None
+        self.primvar_editor_widget = None
+        self.render_settings_editor_widget = None
+        self.stage_variables_widget = None
+        self.multi_viewport_widget = None
+        self.scene_comparison_widget = None
+        self.prim_selection_manager = None
+        self.undo_redo_manager = None
+        self.help_system = None
+        
+        # Initialize help system and add tooltips
+        from .help_system import HelpSystem
+        self.help_system = HelpSystem()
+        self._add_tooltips()
         
         self.init_ui()
         self.setup_connections()
@@ -862,9 +885,20 @@ class USDViewerWindow(QMainWindow):
         self.setGeometry(100, 100, 1600, 900)
         
         # Create central widget with viewport
-        self.viewport = ViewportWidget()
-        self.viewport.set_stage_manager(self.stage_manager)
-        self.setCentralWidget(self.viewport)
+        # Try to use Hydra viewport if available, fallback to OpenGL
+        try:
+            from .hydra_viewport import HydraViewportWidget
+            self.hydra_viewport = HydraViewportWidget()
+            self.hydra_viewport.set_stage_manager(self.stage_manager)
+            self.viewport = ViewportWidget()  # Keep as fallback
+            self.viewport.set_stage_manager(self.stage_manager)
+            # Start with OpenGL viewport
+            self.setCentralWidget(self.viewport)
+        except ImportError:
+            self.viewport = ViewportWidget()
+            self.viewport.set_stage_manager(self.stage_manager)
+            self.setCentralWidget(self.viewport)
+            self.hydra_viewport = None
         
         # Create menus
         self.create_menus()
@@ -932,6 +966,89 @@ class USDViewerWindow(QMainWindow):
         unload_payloads_action = QAction("&Unload All Payloads", self)
         unload_payloads_action.triggered.connect(self.unload_all_payloads)
         view_menu.addAction(unload_payloads_action)
+        
+        # Tools menu
+        tools_menu = menubar.addMenu("&Tools")
+        
+        layer_comp_action = QAction("&Layer Composition...", self)
+        layer_comp_action.triggered.connect(self.show_layer_composition)
+        tools_menu.addAction(layer_comp_action)
+        
+        animation_editor_action = QAction("&Animation Curve Editor...", self)
+        animation_editor_action.triggered.connect(self.show_animation_editor)
+        tools_menu.addAction(animation_editor_action)
+        
+        material_editor_action = QAction("&Material Editor...", self)
+        material_editor_action.triggered.connect(self.show_material_editor)
+        tools_menu.addAction(material_editor_action)
+        
+        scene_search_action = QAction("&Scene Search & Filter...", self)
+        scene_search_action.triggered.connect(self.show_scene_search)
+        tools_menu.addAction(scene_search_action)
+        
+        tools_menu.addSeparator()
+        
+        hydra_toggle_action = QAction("Use &Hydra 2.0 Rendering", self, checkable=True)
+        hydra_toggle_action.setChecked(False)
+        hydra_toggle_action.triggered.connect(self.toggle_hydra_rendering)
+        tools_menu.addAction(hydra_toggle_action)
+        
+        tools_menu.addSeparator()
+        
+        # Medium priority features
+        camera_mgr_action = QAction("&Camera Management...", self)
+        camera_mgr_action.triggered.connect(self.show_camera_manager)
+        tools_menu.addAction(camera_mgr_action)
+        
+        prim_props_action = QAction("&Prim Properties...", self)
+        prim_props_action.triggered.connect(self.show_prim_properties)
+        tools_menu.addAction(prim_props_action)
+        
+        collection_editor_action = QAction("&Collection Editor...", self)
+        collection_editor_action.triggered.connect(self.show_collection_editor)
+        tools_menu.addAction(collection_editor_action)
+        
+        primvar_editor_action = QAction("&Primvar Editor...", self)
+        primvar_editor_action.triggered.connect(self.show_primvar_editor)
+        tools_menu.addAction(primvar_editor_action)
+        
+        render_settings_editor_action = QAction("&Render Settings Editor...", self)
+        render_settings_editor_action.triggered.connect(self.show_render_settings_editor)
+        tools_menu.addAction(render_settings_editor_action)
+        
+        tools_menu.addSeparator()
+        
+        # Additional features
+        stage_variables_action = QAction("&Stage Variables...", self)
+        stage_variables_action.triggered.connect(self.show_stage_variables)
+        tools_menu.addAction(stage_variables_action)
+        
+        tools_menu.addSeparator()
+        
+        # Advanced features
+        multi_viewport_action = QAction("&Multi-Viewport...", self)
+        multi_viewport_action.triggered.connect(self.show_multi_viewport)
+        tools_menu.addAction(multi_viewport_action)
+        
+        scene_comparison_action = QAction("&Scene Comparison...", self)
+        scene_comparison_action.triggered.connect(self.show_scene_comparison)
+        tools_menu.addAction(scene_comparison_action)
+        
+        batch_operations_action = QAction("&Batch Operations...", self)
+        batch_operations_action.triggered.connect(self.show_batch_operations)
+        tools_menu.addAction(batch_operations_action)
+        
+        # Help menu
+        help_menu = menubar.addMenu("&Help")
+        
+        help_action = QAction("&Help...", self)
+        help_action.setShortcut(QKeySequence.HelpContents)
+        help_action.triggered.connect(self.show_help)
+        help_menu.addAction(help_action)
+        
+        about_action = QAction("&About xStage", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
         
     def create_toolbar(self):
         """Create main toolbar"""
@@ -1111,10 +1228,48 @@ class USDViewerWindow(QMainWindow):
             self.fps_spinbox.setValue(int(self.stage_manager.fps))
             
             # Update viewport
-            self.viewport.update_geometry(float(start))
+            if self.use_hydra and self.hydra_viewport:
+                self.hydra_viewport.set_stage(self.stage_manager.stage)
+                self.hydra_viewport.update_geometry(float(start))
+            else:
+                self.viewport.update_geometry(float(start))
             
             # Update hierarchy
             self.update_hierarchy()
+            
+            # Update feature widgets
+            if self.layer_composition_widget:
+                self.layer_composition_widget.set_stage(self.stage_manager.stage)
+            if self.animation_editor_widget:
+                self.animation_editor_widget.set_stage(self.stage_manager.stage)
+            if self.material_editor_widget:
+                self.material_editor_widget.set_stage(self.stage_manager.stage)
+            if self.scene_search_widget:
+                self.scene_search_widget.set_stage(self.stage_manager.stage)
+            if self.camera_manager_widget:
+                self.camera_manager_widget.set_stage(self.stage_manager.stage)
+            if self.prim_properties_widget and self.prim_selection_manager:
+                self.prim_properties_widget.set_selection_manager(self.prim_selection_manager)
+            if self.collection_editor_widget:
+                self.collection_editor_widget.set_stage(self.stage_manager.stage)
+            if self.primvar_editor_widget:
+                self.primvar_editor_widget.set_stage(self.stage_manager.stage)
+            if self.render_settings_editor_widget:
+                self.render_settings_editor_widget.set_stage(self.stage_manager.stage)
+            if self.stage_variables_widget:
+                self.stage_variables_widget.set_stage(self.stage_manager.stage)
+            if self.multi_viewport_widget:
+                self.multi_viewport_widget.set_stage_manager(self.stage_manager)
+            
+            # Initialize undo/redo
+            if USD_AVAILABLE:
+                from .undo_redo import UndoRedoManager
+                self.undo_redo_manager = UndoRedoManager()
+            
+            # Initialize prim selection manager
+            if USD_AVAILABLE and self.stage_manager.stage:
+                from .prim_selection import PrimSelectionManager
+                self.prim_selection_manager = PrimSelectionManager(self.stage_manager.stage)
             
             self.statusBar().showMessage(f"Loaded: {filepath}", 5000)
             self.setWindowTitle(f"USD Viewer - {Path(filepath).name}")
@@ -1216,10 +1371,10 @@ class USDViewerWindow(QMainWindow):
         
     def import_convert_file(self):
         """Import and convert 3D file to USD"""
-        from converter import ConverterDialog
+        from .converter_ui import ConverterDialog
         dialog = ConverterDialog(self)
         if dialog.exec():
-            output_path = dialog.get_output_path()
+            output_path = dialog.output_path_edit.text()
             if output_path and os.path.exists(output_path):
                 self.load_usd_file(output_path)
                 
@@ -1251,7 +1406,10 @@ class USDViewerWindow(QMainWindow):
     def on_timeline_changed(self, value):
         """Handle timeline slider change"""
         self.frame_label.setText(f"Frame: {value}")
-        self.viewport.update_geometry(float(value))
+        if self.use_hydra and self.hydra_viewport:
+            self.hydra_viewport.update_geometry(float(value))
+        else:
+            self.viewport.update_geometry(float(value))
         
     def on_fps_changed(self, fps):
         """Handle FPS change"""
@@ -1355,6 +1513,300 @@ class USDViewerWindow(QMainWindow):
         count = self.payload_manager.unload_all_payloads()
         self.statusBar().showMessage(f"Unloaded {count} payload(s)", 3000)
         self.update_hierarchy()  # Refresh hierarchy to show unloaded state
+    
+    def show_layer_composition(self):
+        """Show layer composition dock"""
+        if not self.layer_composition_widget:
+            from .layer_composition_ui import LayerCompositionWidget
+            self.layer_composition_widget = LayerCompositionWidget()
+            dock = QDockWidget("Layer Composition", self)
+            dock.setWidget(self.layer_composition_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.layer_composition_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.layer_composition_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_animation_editor(self):
+        """Show animation curve editor dock"""
+        if not self.animation_editor_widget:
+            from .animation_curve_ui import AnimationCurveEditorWidget
+            self.animation_editor_widget = AnimationCurveEditorWidget()
+            dock = QDockWidget("Animation Curve Editor", self)
+            dock.setWidget(self.animation_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.animation_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.animation_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_material_editor(self):
+        """Show material editor dock"""
+        if not self.material_editor_widget:
+            from .material_editor_ui import MaterialEditorWidget
+            self.material_editor_widget = MaterialEditorWidget()
+            dock = QDockWidget("Material Editor", self)
+            dock.setWidget(self.material_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.material_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.material_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_scene_search(self):
+        """Show scene search dock"""
+        if not self.scene_search_widget:
+            from .scene_search_ui import SceneSearchWidget
+            self.scene_search_widget = SceneSearchWidget()
+            self.scene_search_widget.selection_changed.connect(self.on_search_selection_changed)
+            dock = QDockWidget("Scene Search & Filter", self)
+            dock.setWidget(self.scene_search_widget)
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.scene_search_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.scene_search_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def on_search_selection_changed(self, prim_path: str):
+        """Handle search selection change"""
+        # Select prim in hierarchy tree
+        items = self.hierarchy_tree.findItems(prim_path, Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive, 0)
+        if items:
+            self.hierarchy_tree.setCurrentItem(items[0])
+            self.hierarchy_tree.scrollToItem(items[0])
+    
+    def toggle_hydra_rendering(self, checked: bool):
+        """Toggle between Hydra and OpenGL rendering"""
+        if not self.hydra_viewport:
+            QMessageBox.warning(self, "Hydra Not Available", 
+                              "Hydra 2.0 viewport is not available. Using OpenGL fallback.")
+            return
+        
+        self.use_hydra = checked
+        
+        if checked:
+            # Switch to Hydra
+            self.hydra_viewport.set_stage(self.stage_manager.stage)
+            if self.stage_manager.stage:
+                self.hydra_viewport.update_geometry(self.stage_manager.current_time)
+            self.setCentralWidget(self.hydra_viewport)
+            self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
+        else:
+            # Switch to OpenGL
+            self.setCentralWidget(self.viewport)
+            if self.stage_manager.stage:
+                self.viewport.update_geometry(self.stage_manager.current_time)
+            self.statusBar().showMessage("Using OpenGL rendering", 3000)
+    
+    def show_camera_manager(self):
+        """Show camera manager dock"""
+        if not self.camera_manager_widget:
+            from .camera_manager_ui import CameraManagerWidget
+            self.camera_manager_widget = CameraManagerWidget()
+            self.camera_manager_widget.camera_selected.connect(self.on_camera_selected)
+            dock = QDockWidget("Camera Management", self)
+            dock.setWidget(self.camera_manager_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.camera_manager_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.camera_manager_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_prim_properties(self):
+        """Show prim properties dock"""
+        if not self.prim_properties_widget:
+            from .prim_selection_ui import PrimPropertiesWidget
+            self.prim_properties_widget = PrimPropertiesWidget()
+            dock = QDockWidget("Prim Properties", self)
+            dock.setWidget(self.prim_properties_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.prim_selection_manager:
+                self.prim_properties_widget.set_selection_manager(self.prim_selection_manager)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.prim_properties_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_collection_editor(self):
+        """Show collection editor dock"""
+        if not self.collection_editor_widget:
+            from .collection_editor_ui import CollectionEditorWidget
+            self.collection_editor_widget = CollectionEditorWidget()
+            dock = QDockWidget("Collection Editor", self)
+            dock.setWidget(self.collection_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.collection_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.collection_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_primvar_editor(self):
+        """Show primvar editor dock"""
+        if not self.primvar_editor_widget:
+            from .primvar_editor_ui import PrimvarEditorWidget
+            self.primvar_editor_widget = PrimvarEditorWidget()
+            dock = QDockWidget("Primvar Editor", self)
+            dock.setWidget(self.primvar_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.primvar_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.primvar_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_render_settings_editor(self):
+        """Show render settings editor dock"""
+        if not self.render_settings_editor_widget:
+            from .render_settings_editor_ui import RenderSettingsEditorWidget
+            self.render_settings_editor_widget = RenderSettingsEditorWidget()
+            dock = QDockWidget("Render Settings Editor", self)
+            dock.setWidget(self.render_settings_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.render_settings_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.render_settings_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def on_camera_selected(self, camera_path: str):
+        """Handle camera selection"""
+        # Could switch viewport to use this camera
+        self.statusBar().showMessage(f"Selected camera: {camera_path}", 2000)
+    
+    def show_multi_viewport(self):
+        """Show multi-viewport widget"""
+        if not self.multi_viewport_widget:
+            from .multi_viewport import MultiViewportWidget
+            self.multi_viewport_widget = MultiViewportWidget()
+            self.multi_viewport_widget.set_stage_manager(self.stage_manager)
+            # Replace central widget
+            self.setCentralWidget(self.multi_viewport_widget)
+        else:
+            self.setCentralWidget(self.multi_viewport_widget)
+    
+    def show_scene_comparison(self):
+        """Show scene comparison dock"""
+        if not self.scene_comparison_widget:
+            from .scene_comparison_ui import SceneComparisonWidget
+            self.scene_comparison_widget = SceneComparisonWidget()
+            dock = QDockWidget("Scene Comparison", self)
+            dock.setWidget(self.scene_comparison_widget)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.scene_comparison_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_batch_operations(self):
+        """Show batch operations dialog"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QListWidget
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Batch Operations")
+        dialog.setMinimumSize(400, 300)
+        
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Batch Operations"))
+        layout.addWidget(QLabel("Select prims from hierarchy, then choose operation:"))
+        
+        # Operation buttons
+        from .batch_operations import BatchOperationManager
+        if self.stage_manager and self.stage_manager.stage:
+            batch_mgr = BatchOperationManager(self.stage_manager.stage)
+            # Add batch operation buttons here
+            pass
+        
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
+    
+    def show_help(self):
+        """Show help dialog"""
+        from .help_system import HelpDialog
+        help_dialog = HelpDialog(self)
+        help_dialog.exec()
+    
+    def show_about(self):
+        """Show about dialog"""
+        QMessageBox.about(
+            self, "About xStage",
+            "<h2>xStage USD Viewer</h2>"
+            "<p>Professional USD viewer and converter for VFX pipelines</p>"
+            "<p>Version 0.1.0</p>"
+            "<p>Built with OpenUSD 25.11</p>"
+            "<p>© NOX VFX & Contributors</p>"
+        )
+    
+    def _add_tooltips(self):
+        """Add tooltips to UI elements"""
+        if not self.help_system:
+            return
+        
+        # Add tooltips to common widgets
+        if hasattr(self, 'hierarchy_tree'):
+            self.help_system.set_tooltip(self.hierarchy_tree, 'hierarchy')
+        if hasattr(self, 'viewport'):
+            self.help_system.set_tooltip(self.viewport, 'viewport')
+        if hasattr(self, 'timeline_slider'):
+            self.help_system.set_tooltip(self.timeline_slider, 'timeline')
+    
+    def show_stage_variables(self):
+        """Show stage variables dock"""
+        if not self.stage_variables_widget:
+            from .stage_variables_ui import StageVariablesWidget
+            self.stage_variables_widget = StageVariablesWidget()
+            dock = QDockWidget("Stage Variables", self)
+            dock.setWidget(self.stage_variables_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.stage_variables_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.stage_variables_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
     
     def on_hierarchy_item_double_clicked(self, item: QTreeWidgetItem, column: int):
         """Handle double-click on hierarchy item for variant selection"""
