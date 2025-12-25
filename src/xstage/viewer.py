@@ -25,13 +25,31 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 try:
-    from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, Kind
+    from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, Kind, UsdLux, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils
     USD_AVAILABLE = True
 except ImportError:
     USD_AVAILABLE = False
     print("Warning: USD Python bindings not found. Install with: pip install usd-core")
+    
+    # Create dummy classes for type hints
+    class UsdLux:
+        pass
+    class UsdCollectionAPI:
+        pass
+    class UsdRender:
+        pass
+    class UsdSkel:
+        pass
+    class UsdUtils:
+        pass
 
 import numpy as np
+
+# Import UsdLux support if available
+try:
+    from .usd_lux_support import UsdLuxExtractor
+except ImportError:
+    UsdLuxExtractor = None
 
 
 @dataclass
@@ -90,6 +108,12 @@ class USDStageManager:
             'meshes': [],
             'cameras': [],
             'lights': [],
+            'materials': [],
+            'collections': [],
+            'variants': [],
+            'primvars': [],
+            'render_settings': [],
+            'skeletons': [],
             'bounds': None
         }
         
@@ -105,10 +129,48 @@ class USDStageManager:
                 if cam_data:
                     geometry_data['cameras'].append(cam_data)
                     
-            elif prim.IsA(UsdGeom.Light):
-                light_data = self._extract_light(prim, time_code)
+            elif USD_AVAILABLE and prim.IsA(UsdLux.Light):
+                # Use modern UsdLux instead of deprecated UsdGeom.Light
+                if UsdLuxExtractor:
+                    light_data = UsdLuxExtractor.extract_light(prim, time_code)
+                else:
+                    light_data = self._extract_light_fallback(prim, time_code)
                 if light_data:
                     geometry_data['lights'].append(light_data)
+                    
+            elif USD_AVAILABLE and prim.IsA(UsdShade.Material):
+                material_data = self._extract_material(prim, time_code)
+                if material_data:
+                    geometry_data['materials'].append(material_data)
+                    
+            elif USD_AVAILABLE and prim.HasAPI(UsdCollectionAPI):
+                collection_data = self._extract_collection(prim, time_code)
+                if collection_data:
+                    geometry_data['collections'].append(collection_data)
+                    
+            elif USD_AVAILABLE and prim.GetVariantSets().GetNames():
+                variant_data = self._extract_variants(prim)
+                if variant_data:
+                    geometry_data['variants'].append(variant_data)
+                    
+            elif USD_AVAILABLE and prim.IsA(UsdRender.RenderSettings):
+                render_data = self._extract_render_settings(prim, time_code)
+                if render_data:
+                    geometry_data['render_settings'].append(render_data)
+                    
+            elif USD_AVAILABLE and prim.IsA(UsdSkel.Root):
+                skeleton_data = self._extract_skeleton(prim, time_code)
+                if skeleton_data:
+                    geometry_data['skeletons'].append(skeleton_data)
+        
+        # Extract primvars from meshes
+        for mesh_data in geometry_data['meshes']:
+            prim = self.stage.GetPrimAtPath(mesh_data['name'])
+            if prim:
+                primvars = self._extract_primvars(prim, time_code)
+                if primvars:
+                    mesh_data['primvars'] = primvars
+                    geometry_data['primvars'].extend(primvars)
         
         # Calculate scene bounds
         if geometry_data['meshes']:
@@ -173,7 +235,17 @@ class USDStageManager:
             return None
     
     def _extract_light(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
-        """Extract light data"""
+        """Extract light data - DEPRECATED: Use UsdLuxExtractor instead"""
+        # This method is kept for backward compatibility but should use UsdLuxExtractor
+        if USD_AVAILABLE and prim.IsA(UsdLux.Light):
+            if UsdLuxExtractor:
+                return UsdLuxExtractor.extract_light(prim, time_code)
+            else:
+                return self._extract_light_fallback(prim, time_code)
+        return None
+    
+    def _extract_light_fallback(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
+        """Fallback light extraction if UsdLuxExtractor is not available"""
         try:
             xformable = UsdGeom.Xformable(prim)
             transform = xformable.ComputeLocalToWorldTransform(time_code)
@@ -185,6 +257,274 @@ class USDStageManager:
             }
         except Exception as e:
             print(f"Error extracting light {prim.GetPath()}: {e}")
+            return None
+    
+    def _extract_material(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
+        """Extract material data"""
+        try:
+            if not USD_AVAILABLE:
+                return None
+                
+            material = UsdShade.Material(prim)
+            material_data = {
+                'name': prim.GetPath().pathString,
+                'path': prim.GetPath(),
+                'surface_output': None,
+                'displacement_output': None,
+                'volume_output': None,
+                'inputs': {},
+                'surface_shader': None,
+            }
+            
+            # Get surface output
+            surface_output = material.GetSurfaceOutput()
+            if surface_output:
+                material_data['surface_output'] = {
+                    'path': surface_output.GetPath(),
+                    'type': str(surface_output.GetTypeName()),
+                }
+                # Get connected source
+                source = surface_output.GetConnectedSource()
+                if source:
+                    material_data['surface_shader'] = {
+                        'path': source[0].GetPath().pathString,
+                        'output_name': source[1],
+                    }
+            
+            # Get displacement output
+            displacement_output = material.GetDisplacementOutput()
+            if displacement_output:
+                material_data['displacement_output'] = {
+                    'path': displacement_output.GetPath(),
+                    'type': str(displacement_output.GetTypeName()),
+                }
+            
+            # Get volume output
+            volume_output = material.GetVolumeOutput()
+            if volume_output:
+                material_data['volume_output'] = {
+                    'path': volume_output.GetPath(),
+                    'type': str(volume_output.GetTypeName()),
+                }
+            
+            # Extract material inputs
+            for input_attr in material.GetInputs():
+                input_name = input_attr.GetBaseName()
+                input_value = input_attr.Get(time_code)
+                material_data['inputs'][input_name] = {
+                    'value': input_value,
+                    'type': str(input_attr.GetTypeName()),
+                }
+            
+            # Get material binding info
+            binding_api = UsdShade.MaterialBindingAPI(prim)
+            if binding_api:
+                # Get direct binding
+                direct_binding = binding_api.GetDirectBinding()
+                if direct_binding:
+                    material_data['binding'] = {
+                        'material': direct_binding.GetMaterial().GetPath().pathString if direct_binding.GetMaterial() else None,
+                        'binding_strength': str(direct_binding.GetBindingStrength()),
+                    }
+            
+            return material_data
+        except Exception as e:
+            print(f"Error extracting material {prim.GetPath()}: {e}")
+            return None
+    
+    def _extract_collection(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
+        """Extract collection data"""
+        try:
+            if not USD_AVAILABLE:
+                return None
+                
+            collection_apis = UsdCollectionAPI.GetAllCollectionAPIs(prim)
+            if not collection_apis:
+                return None
+            
+            collections = []
+            for collection_api in collection_apis:
+                collection = collection_api.GetCollection()
+                collection_data = {
+                    'name': collection.GetName(),
+                    'prim_path': prim.GetPath().pathString,
+                    'expansion_rule': str(collection.GetExpansionRule()),
+                    'includes_paths': [str(p) for p in collection.GetIncludesRel().GetTargets()],
+                    'excludes_paths': [str(p) for p in collection.GetExcludesRel().GetTargets()],
+                }
+                
+                # Check if it's a relationship-mode collection
+                if collection_api.GetCollectionName() == collection.GetName():
+                    collection_data['mode'] = 'relationship'
+                else:
+                    # Pattern-based collection
+                    collection_data['mode'] = 'pattern'
+                    # Try to get pattern expression
+                    try:
+                        pattern_attr = prim.GetAttribute(f"collection:{collection.GetName()}:includeRoot")
+                        if pattern_attr:
+                            collection_data['pattern_expression'] = pattern_attr.Get(time_code)
+                    except:
+                        pass
+                
+                collections.append(collection_data)
+            
+            return {
+                'prim_path': prim.GetPath().pathString,
+                'collections': collections,
+            } if collections else None
+        except Exception as e:
+            print(f"Error extracting collection {prim.GetPath()}: {e}")
+            return None
+    
+    def _extract_variants(self, prim: Usd.Prim) -> Optional[Dict]:
+        """Extract variant sets and selections"""
+        try:
+            if not USD_AVAILABLE:
+                return None
+                
+            variant_sets = prim.GetVariantSets()
+            variant_set_names = variant_sets.GetNames()
+            
+            if not variant_set_names:
+                return None
+            
+            variants_data = {
+                'prim_path': prim.GetPath().pathString,
+                'variant_sets': {},
+            }
+            
+            for variant_set_name in variant_set_names:
+                variant_set = variant_sets.GetVariantSet(variant_set_name)
+                current_selection = variant_set.GetVariantSelection()
+                available_variants = variant_set.GetVariantNames()
+                
+                variants_data['variant_sets'][variant_set_name] = {
+                    'current_selection': current_selection,
+                    'available_variants': available_variants,
+                }
+            
+            return variants_data
+        except Exception as e:
+            print(f"Error extracting variants {prim.GetPath()}: {e}")
+            return None
+    
+    def _extract_primvars(self, prim: Usd.Prim, time_code: float) -> Optional[List[Dict]]:
+        """Extract primvars from a prim"""
+        try:
+            if not USD_AVAILABLE:
+                return None
+                
+            primvars_api = UsdGeom.PrimvarsAPI(prim)
+            primvars = primvars_api.GetPrimvars()
+            
+            if not primvars:
+                return None
+            
+            primvar_list = []
+            for primvar in primvars:
+                primvar_name = primvar.GetPrimvarName()
+                interpolation = primvar.GetInterpolation()
+                element_size = primvar.GetElementSize()
+                
+                primvar_data = {
+                    'name': primvar_name,
+                    'type': str(primvar.GetTypeName()),
+                    'interpolation': str(interpolation),
+                    'element_size': element_size,
+                    'is_indexed': primvar.IsIndexed(),
+                }
+                
+                # Get values
+                if primvar.IsIndexed():
+                    primvar_data['values'] = primvar.Get(time_code)
+                    primvar_data['indices'] = primvar.GetIndices(time_code)
+                else:
+                    primvar_data['values'] = primvar.Get(time_code)
+                
+                primvar_list.append(primvar_data)
+            
+            return primvar_list if primvar_list else None
+        except Exception as e:
+            print(f"Error extracting primvars {prim.GetPath()}: {e}")
+            return None
+    
+    def _extract_render_settings(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
+        """Extract render settings"""
+        try:
+            if not USD_AVAILABLE:
+                return None
+                
+            render_settings = UsdRender.RenderSettings(prim)
+            render_data = {
+                'name': prim.GetPath().pathString,
+                'resolution': None,
+                'pixel_aspect_ratio': None,
+                'aspect_ratio_conform_policy': None,
+                'data_windowNDC': None,
+                'disable_motion_blur': None,
+                'camera': None,
+                'included_purposes': [],
+                'material_binding_purposes': [],
+                'rendering_color_space': None,
+                'products': [],
+            }
+            
+            # Get resolution
+            if render_settings.GetResolutionAttr():
+                render_data['resolution'] = render_settings.GetResolutionAttr().Get(time_code)
+            
+            # Get pixel aspect ratio
+            if render_settings.GetPixelAspectRatioAttr():
+                render_data['pixel_aspect_ratio'] = render_settings.GetPixelAspectRatioAttr().Get(time_code)
+            
+            # Get camera
+            if render_settings.GetCameraRel():
+                camera_targets = render_settings.GetCameraRel().GetTargets()
+                if camera_targets:
+                    render_data['camera'] = str(camera_targets[0])
+            
+            # Get products
+            if render_settings.GetProductsRel():
+                product_targets = render_settings.GetProductsRel().GetTargets()
+                render_data['products'] = [str(p) for p in product_targets]
+            
+            return render_data
+        except Exception as e:
+            print(f"Error extracting render settings {prim.GetPath()}: {e}")
+            return None
+    
+    def _extract_skeleton(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
+        """Extract skeleton data"""
+        try:
+            if not USD_AVAILABLE:
+                return None
+                
+            skel_root = UsdSkel.Root(prim)
+            skeleton_data = {
+                'name': prim.GetPath().pathString,
+                'skeletons': [],
+            }
+            
+            # Get skeleton bindings
+            if skel_root.GetSkeletonRel():
+                skeleton_targets = skel_root.GetSkeletonRel().GetTargets()
+                for skeleton_path in skeleton_targets:
+                    skeleton_prim = self.stage.GetPrimAtPath(skeleton_path)
+                    if skeleton_prim and skeleton_prim.IsA(UsdSkel.Skeleton):
+                        skeleton = UsdSkel.Skeleton(skeleton_prim)
+                        joints = skeleton.GetJointsAttr().Get(time_code) if skeleton.GetJointsAttr() else []
+                        bind_transforms = skeleton.GetBindTransformsAttr().Get(time_code) if skeleton.GetBindTransformsAttr() else []
+                        
+                        skeleton_data['skeletons'].append({
+                            'path': str(skeleton_path),
+                            'joints': joints,
+                            'bind_transforms': bind_transforms,
+                        })
+            
+            return skeleton_data if skeleton_data['skeletons'] else None
+        except Exception as e:
+            print(f"Error extracting skeleton {prim.GetPath()}: {e}")
             return None
     
     def _calculate_bounds(self, meshes: List[Dict]) -> Dict:
@@ -219,7 +559,7 @@ class USDStageManager:
         if not self.stage:
             return {}
             
-        return {
+        info = {
             'path': self.stage.GetRootLayer().identifier,
             'start_time': self.time_range[0],
             'end_time': self.time_range[1],
@@ -227,6 +567,18 @@ class USDStageManager:
             'up_axis': UsdGeom.GetStageUpAxis(self.stage),
             'meters_per_unit': UsdGeom.GetStageMetersPerUnit(self.stage),
         }
+        
+        # Add color space info if available
+        if USD_AVAILABLE:
+            try:
+                from .color_space import ColorSpaceManager
+                default_color_space = ColorSpaceManager.get_default_color_space(self.stage)
+                if default_color_space:
+                    info['default_color_space'] = default_color_space
+            except:
+                pass
+        
+        return info
 
 
 class ViewportWidget(QOpenGLWidget):
@@ -499,6 +851,30 @@ class USDViewerWindow(QMainWindow):
         self.is_playing = False
         self.playback_timer = QTimer()
         self.playback_timer.timeout.connect(self.advance_frame)
+        self.payload_manager = None
+        self.use_hydra = False
+        
+        # Feature widgets
+        self.layer_composition_widget = None
+        self.animation_editor_widget = None
+        self.material_editor_widget = None
+        self.scene_search_widget = None
+        self.camera_manager_widget = None
+        self.prim_properties_widget = None
+        self.collection_editor_widget = None
+        self.primvar_editor_widget = None
+        self.render_settings_editor_widget = None
+        self.stage_variables_widget = None
+        self.multi_viewport_widget = None
+        self.scene_comparison_widget = None
+        self.prim_selection_manager = None
+        self.undo_redo_manager = None
+        self.help_system = None
+        
+        # Initialize help system and add tooltips
+        from .help_system import HelpSystem
+        self.help_system = HelpSystem()
+        self._add_tooltips()
         
         self.init_ui()
         self.setup_connections()
@@ -509,9 +885,20 @@ class USDViewerWindow(QMainWindow):
         self.setGeometry(100, 100, 1600, 900)
         
         # Create central widget with viewport
-        self.viewport = ViewportWidget()
-        self.viewport.set_stage_manager(self.stage_manager)
-        self.setCentralWidget(self.viewport)
+        # Try to use Hydra viewport if available, fallback to OpenGL
+        try:
+            from .hydra_viewport import HydraViewportWidget
+            self.hydra_viewport = HydraViewportWidget()
+            self.hydra_viewport.set_stage_manager(self.stage_manager)
+            self.viewport = ViewportWidget()  # Keep as fallback
+            self.viewport.set_stage_manager(self.stage_manager)
+            # Start with OpenGL viewport
+            self.setCentralWidget(self.viewport)
+        except ImportError:
+            self.viewport = ViewportWidget()
+            self.viewport.set_stage_manager(self.stage_manager)
+            self.setCentralWidget(self.viewport)
+            self.hydra_viewport = None
         
         # Create menus
         self.create_menus()
@@ -569,6 +956,100 @@ class USDViewerWindow(QMainWindow):
         frame_action.triggered.connect(self.frame_all)
         view_menu.addAction(frame_action)
         
+        view_menu.addSeparator()
+        
+        # Payload management
+        load_payloads_action = QAction("&Load All Payloads", self)
+        load_payloads_action.triggered.connect(self.load_all_payloads)
+        view_menu.addAction(load_payloads_action)
+        
+        unload_payloads_action = QAction("&Unload All Payloads", self)
+        unload_payloads_action.triggered.connect(self.unload_all_payloads)
+        view_menu.addAction(unload_payloads_action)
+        
+        # Tools menu
+        tools_menu = menubar.addMenu("&Tools")
+        
+        layer_comp_action = QAction("&Layer Composition...", self)
+        layer_comp_action.triggered.connect(self.show_layer_composition)
+        tools_menu.addAction(layer_comp_action)
+        
+        animation_editor_action = QAction("&Animation Curve Editor...", self)
+        animation_editor_action.triggered.connect(self.show_animation_editor)
+        tools_menu.addAction(animation_editor_action)
+        
+        material_editor_action = QAction("&Material Editor...", self)
+        material_editor_action.triggered.connect(self.show_material_editor)
+        tools_menu.addAction(material_editor_action)
+        
+        scene_search_action = QAction("&Scene Search & Filter...", self)
+        scene_search_action.triggered.connect(self.show_scene_search)
+        tools_menu.addAction(scene_search_action)
+        
+        tools_menu.addSeparator()
+        
+        hydra_toggle_action = QAction("Use &Hydra 2.0 Rendering", self, checkable=True)
+        hydra_toggle_action.setChecked(False)
+        hydra_toggle_action.triggered.connect(self.toggle_hydra_rendering)
+        tools_menu.addAction(hydra_toggle_action)
+        
+        tools_menu.addSeparator()
+        
+        # Medium priority features
+        camera_mgr_action = QAction("&Camera Management...", self)
+        camera_mgr_action.triggered.connect(self.show_camera_manager)
+        tools_menu.addAction(camera_mgr_action)
+        
+        prim_props_action = QAction("&Prim Properties...", self)
+        prim_props_action.triggered.connect(self.show_prim_properties)
+        tools_menu.addAction(prim_props_action)
+        
+        collection_editor_action = QAction("&Collection Editor...", self)
+        collection_editor_action.triggered.connect(self.show_collection_editor)
+        tools_menu.addAction(collection_editor_action)
+        
+        primvar_editor_action = QAction("&Primvar Editor...", self)
+        primvar_editor_action.triggered.connect(self.show_primvar_editor)
+        tools_menu.addAction(primvar_editor_action)
+        
+        render_settings_editor_action = QAction("&Render Settings Editor...", self)
+        render_settings_editor_action.triggered.connect(self.show_render_settings_editor)
+        tools_menu.addAction(render_settings_editor_action)
+        
+        tools_menu.addSeparator()
+        
+        # Additional features
+        stage_variables_action = QAction("&Stage Variables...", self)
+        stage_variables_action.triggered.connect(self.show_stage_variables)
+        tools_menu.addAction(stage_variables_action)
+        
+        tools_menu.addSeparator()
+        
+        # Advanced features
+        multi_viewport_action = QAction("&Multi-Viewport...", self)
+        multi_viewport_action.triggered.connect(self.show_multi_viewport)
+        tools_menu.addAction(multi_viewport_action)
+        
+        scene_comparison_action = QAction("&Scene Comparison...", self)
+        scene_comparison_action.triggered.connect(self.show_scene_comparison)
+        tools_menu.addAction(scene_comparison_action)
+        
+        batch_operations_action = QAction("&Batch Operations...", self)
+        batch_operations_action.triggered.connect(self.show_batch_operations)
+        tools_menu.addAction(batch_operations_action)
+        
+        # Help menu
+        help_menu = menubar.addMenu("&Help")
+        
+        help_action = QAction("&Help...", self)
+        help_action.setShortcut(QKeySequence.HelpContents)
+        help_action.triggered.connect(self.show_help)
+        help_menu.addAction(help_action)
+        
+        about_action = QAction("&About xStage", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+        
     def create_toolbar(self):
         """Create main toolbar"""
         toolbar = QToolBar("Main Toolbar")
@@ -595,21 +1076,44 @@ class USDViewerWindow(QMainWindow):
         dock = QDockWidget("Scene Hierarchy", self)
         self.hierarchy_tree = QTreeWidget()
         self.hierarchy_tree.setHeaderLabel("Prims")
+        self.hierarchy_tree.itemDoubleClicked.connect(self.on_hierarchy_item_double_clicked)
         dock.setWidget(self.hierarchy_tree)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         
     def create_info_dock(self):
-        """Create stage info dock"""
+        """Create stage info dock with enhanced information"""
         dock = QDockWidget("Stage Info", self)
         info_widget = QWidget()
-        layout = QFormLayout()
+        layout = QVBoxLayout()
         
+        # Basic stage info
+        basic_group = QGroupBox("Stage Information")
+        basic_layout = QFormLayout()
         self.info_labels = {}
-        for key in ['path', 'start_time', 'end_time', 'fps', 'up_axis', 'meters_per_unit']:
+        for key in ['path', 'start_time', 'end_time', 'fps', 'up_axis', 'meters_per_unit', 'default_color_space']:
             label = QLabel("-")
             self.info_labels[key] = label
-            layout.addRow(key.replace('_', ' ').title() + ":", label)
-            
+            basic_layout.addRow(key.replace('_', ' ').title() + ":", label)
+        basic_group.setLayout(basic_layout)
+        layout.addWidget(basic_group)
+        
+        # Statistics
+        stats_group = QGroupBox("Statistics")
+        stats_layout = QFormLayout()
+        self.stats_labels = {}
+        for key in ['meshes', 'cameras', 'lights', 'materials', 'collections', 'variants']:
+            label = QLabel("0")
+            self.stats_labels[key] = label
+            stats_layout.addRow(key.replace('_', ' ').title() + ":", label)
+        stats_group.setLayout(stats_layout)
+        layout.addWidget(stats_group)
+        
+        # Validation button
+        validate_btn = QPushButton("Validate USD")
+        validate_btn.clicked.connect(self.validate_stage)
+        layout.addWidget(validate_btn)
+        
+        layout.addStretch()
         info_widget.setLayout(layout)
         dock.setWidget(info_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
@@ -695,11 +1199,26 @@ class USDViewerWindow(QMainWindow):
         if self.stage_manager.load_stage(filepath):
             self.current_file = filepath
             
+            # Initialize payload manager
+            if USD_AVAILABLE:
+                from .payloads import PayloadManager
+                self.payload_manager = PayloadManager(self.stage_manager.stage)
+            
             # Update UI
             info = self.stage_manager.get_stage_info()
             for key, label in self.info_labels.items():
                 if key in info:
                     label.setText(str(info[key]))
+            
+            # Update statistics
+            geometry_data = self.stage_manager.get_geometry_data(self.stage_manager.current_time)
+            if hasattr(self, 'stats_labels'):
+                self.stats_labels['meshes'].setText(str(len(geometry_data.get('meshes', []))))
+                self.stats_labels['cameras'].setText(str(len(geometry_data.get('cameras', []))))
+                self.stats_labels['lights'].setText(str(len(geometry_data.get('lights', []))))
+                self.stats_labels['materials'].setText(str(len(geometry_data.get('materials', []))))
+                self.stats_labels['collections'].setText(str(len(geometry_data.get('collections', []))))
+                self.stats_labels['variants'].setText(str(len(geometry_data.get('variants', []))))
             
             # Setup timeline
             start = int(self.stage_manager.time_range[0])
@@ -709,10 +1228,48 @@ class USDViewerWindow(QMainWindow):
             self.fps_spinbox.setValue(int(self.stage_manager.fps))
             
             # Update viewport
-            self.viewport.update_geometry(float(start))
+            if self.use_hydra and self.hydra_viewport:
+                self.hydra_viewport.set_stage(self.stage_manager.stage)
+                self.hydra_viewport.update_geometry(float(start))
+            else:
+                self.viewport.update_geometry(float(start))
             
             # Update hierarchy
             self.update_hierarchy()
+            
+            # Update feature widgets
+            if self.layer_composition_widget:
+                self.layer_composition_widget.set_stage(self.stage_manager.stage)
+            if self.animation_editor_widget:
+                self.animation_editor_widget.set_stage(self.stage_manager.stage)
+            if self.material_editor_widget:
+                self.material_editor_widget.set_stage(self.stage_manager.stage)
+            if self.scene_search_widget:
+                self.scene_search_widget.set_stage(self.stage_manager.stage)
+            if self.camera_manager_widget:
+                self.camera_manager_widget.set_stage(self.stage_manager.stage)
+            if self.prim_properties_widget and self.prim_selection_manager:
+                self.prim_properties_widget.set_selection_manager(self.prim_selection_manager)
+            if self.collection_editor_widget:
+                self.collection_editor_widget.set_stage(self.stage_manager.stage)
+            if self.primvar_editor_widget:
+                self.primvar_editor_widget.set_stage(self.stage_manager.stage)
+            if self.render_settings_editor_widget:
+                self.render_settings_editor_widget.set_stage(self.stage_manager.stage)
+            if self.stage_variables_widget:
+                self.stage_variables_widget.set_stage(self.stage_manager.stage)
+            if self.multi_viewport_widget:
+                self.multi_viewport_widget.set_stage_manager(self.stage_manager)
+            
+            # Initialize undo/redo
+            if USD_AVAILABLE:
+                from .undo_redo import UndoRedoManager
+                self.undo_redo_manager = UndoRedoManager()
+            
+            # Initialize prim selection manager
+            if USD_AVAILABLE and self.stage_manager.stage:
+                from .prim_selection import PrimSelectionManager
+                self.prim_selection_manager = PrimSelectionManager(self.stage_manager.stage)
             
             self.statusBar().showMessage(f"Loaded: {filepath}", 5000)
             self.setWindowTitle(f"USD Viewer - {Path(filepath).name}")
@@ -721,21 +1278,88 @@ class USDViewerWindow(QMainWindow):
             self.statusBar().showMessage("Ready")
             
     def update_hierarchy(self):
-        """Update scene hierarchy tree"""
+        """Update scene hierarchy tree with enhanced features"""
         self.hierarchy_tree.clear()
         
         if not self.stage_manager.stage:
             return
+        
+        # Get geometry data to access variants, collections, materials
+        geometry_data = self.stage_manager.get_geometry_data(self.stage_manager.current_time)
+        
+        # Create lookup dictionaries
+        variants_dict = {v['prim_path']: v for v in geometry_data.get('variants', [])}
+        collections_dict = {c['prim_path']: c for c in geometry_data.get('collections', [])}
+        materials_dict = {m['name']: m for m in geometry_data.get('materials', [])}
             
         def add_prim_to_tree(prim: Usd.Prim, parent_item: QTreeWidgetItem = None):
-            """Recursively add prims to tree"""
-            item = QTreeWidgetItem([prim.GetName()])
+            """Recursively add prims to tree with enhanced info"""
+            prim_name = prim.GetName() or prim.GetPath().pathString
+            
+            # Build display name with type indicators
+            display_name = prim_name
+            type_indicators = []
+            
+            # Add type indicators
+            if prim.IsA(UsdGeom.Mesh):
+                type_indicators.append("📦")
+            elif prim.IsA(UsdGeom.Camera):
+                type_indicators.append("📷")
+            elif USD_AVAILABLE and prim.IsA(UsdLux.Light):
+                type_indicators.append("💡")
+            elif USD_AVAILABLE and prim.IsA(UsdShade.Material):
+                type_indicators.append("🎨")
+            elif USD_AVAILABLE and prim.IsA(UsdSkel.Root):
+                type_indicators.append("🦴")
+            elif USD_AVAILABLE and prim.IsA(UsdRender.RenderSettings):
+                type_indicators.append("🎬")
+            
+            # Add variant indicator
+            prim_path_str = prim.GetPath().pathString
+            if prim_path_str in variants_dict:
+                variant_info = variants_dict[prim_path_str]
+                if variant_info['variant_sets']:
+                    type_indicators.append("🔀")
+            
+            # Add collection indicator
+            if prim_path_str in collections_dict:
+                type_indicators.append("📋")
+            
+            # Add payload indicator
+            if prim.HasPayload():
+                type_indicators.append("📥")
+            
+            if type_indicators:
+                display_name = f"{' '.join(type_indicators)} {prim_name}"
+            
+            item = QTreeWidgetItem([display_name])
+            item.setData(0, Qt.ItemDataRole.UserRole, prim.GetPath().pathString)
+            
+            # Store prim info in item
+            item.setToolTip(0, f"Type: {prim.GetTypeName()}\nPath: {prim.GetPath()}")
             
             if parent_item:
                 parent_item.addChild(item)
             else:
                 self.hierarchy_tree.addTopLevelItem(item)
             
+            # Add variant sets as children if present
+            if prim_path_str in variants_dict:
+                variant_info = variants_dict[prim_path_str]
+                for variant_set_name, variant_data in variant_info['variant_sets'].items():
+                    variant_item = QTreeWidgetItem([f"🔀 {variant_set_name}: {variant_data['current_selection']}"])
+                    variant_item.setData(0, Qt.ItemDataRole.UserRole, f"{prim_path_str}::{variant_set_name}")
+                    item.addChild(variant_item)
+            
+            # Add collections as children if present
+            if prim_path_str in collections_dict:
+                collection_info = collections_dict[prim_path_str]
+                for collection in collection_info['collections']:
+                    collection_item = QTreeWidgetItem([f"📋 {collection['name']} ({collection['mode']})"])
+                    collection_item.setData(0, Qt.ItemDataRole.UserRole, f"{prim_path_str}::collection::{collection['name']}")
+                    item.addChild(collection_item)
+            
+            # Recursively add children
             for child in prim.GetChildren():
                 add_prim_to_tree(child, item)
                 
@@ -747,10 +1371,10 @@ class USDViewerWindow(QMainWindow):
         
     def import_convert_file(self):
         """Import and convert 3D file to USD"""
-        from converter import ConverterDialog
+        from .converter_ui import ConverterDialog
         dialog = ConverterDialog(self)
         if dialog.exec():
-            output_path = dialog.get_output_path()
+            output_path = dialog.output_path_edit.text()
             if output_path and os.path.exists(output_path):
                 self.load_usd_file(output_path)
                 
@@ -782,7 +1406,10 @@ class USDViewerWindow(QMainWindow):
     def on_timeline_changed(self, value):
         """Handle timeline slider change"""
         self.frame_label.setText(f"Frame: {value}")
-        self.viewport.update_geometry(float(value))
+        if self.use_hydra and self.hydra_viewport:
+            self.hydra_viewport.update_geometry(float(value))
+        else:
+            self.viewport.update_geometry(float(value))
         
     def on_fps_changed(self, fps):
         """Handle FPS change"""
@@ -821,6 +1448,435 @@ class USDViewerWindow(QMainWindow):
         if self.viewport.geometry_data and 'bounds' in self.viewport.geometry_data:
             self.viewport.frame_bounds(self.viewport.geometry_data['bounds'])
             self.viewport.update()
+    
+    def validate_stage(self):
+        """Validate the current USD stage"""
+        if not USD_AVAILABLE:
+            QMessageBox.warning(self, "USD Not Available", 
+                              "USD Python bindings not installed.")
+            return
+        
+        try:
+            from .validation import USDValidator
+            
+            validator = USDValidator()
+            result = validator.validate_stage(self.stage_manager.stage)
+            
+            # Show results
+            message = "USD Validation Results\n\n"
+            if result['passed']:
+                message += "✅ Validation PASSED\n\n"
+            else:
+                message += "❌ Validation FAILED\n\n"
+            
+            if result['errors']:
+                message += f"Errors ({len(result['errors'])}):\n"
+                for error in result['errors'][:10]:  # Show first 10
+                    message += f"  • {error.get('message', str(error))}\n"
+                if len(result['errors']) > 10:
+                    message += f"  ... and {len(result['errors']) - 10} more\n"
+                message += "\n"
+            
+            if result['warnings']:
+                message += f"Warnings ({len(result['warnings'])}):\n"
+                for warning in result['warnings'][:10]:  # Show first 10
+                    message += f"  • {warning.get('message', str(warning))}\n"
+                if len(result['warnings']) > 10:
+                    message += f"  ... and {len(result['warnings']) - 10} more\n"
+                message += "\n"
+            
+            if result['info']:
+                message += f"Info ({len(result['info'])}):\n"
+                for info in result['info'][:5]:  # Show first 5
+                    message += f"  • {info.get('message', str(info))}\n"
+            
+            QMessageBox.information(self, "USD Validation", message)
+        except Exception as e:
+            QMessageBox.critical(self, "Validation Error", f"Error during validation:\n{e}")
+    
+    def load_all_payloads(self):
+        """Load all payloads in the stage"""
+        if not self.payload_manager:
+            QMessageBox.warning(self, "Payload Manager", "Payload manager not initialized.")
+            return
+        
+        count = self.payload_manager.load_all_payloads()
+        self.statusBar().showMessage(f"Loaded {count} payload(s)", 3000)
+        self.update_hierarchy()  # Refresh hierarchy to show loaded state
+    
+    def unload_all_payloads(self):
+        """Unload all payloads in the stage"""
+        if not self.payload_manager:
+            QMessageBox.warning(self, "Payload Manager", "Payload manager not initialized.")
+            return
+        
+        count = self.payload_manager.unload_all_payloads()
+        self.statusBar().showMessage(f"Unloaded {count} payload(s)", 3000)
+        self.update_hierarchy()  # Refresh hierarchy to show unloaded state
+    
+    def show_layer_composition(self):
+        """Show layer composition dock"""
+        if not self.layer_composition_widget:
+            from .layer_composition_ui import LayerCompositionWidget
+            self.layer_composition_widget = LayerCompositionWidget()
+            dock = QDockWidget("Layer Composition", self)
+            dock.setWidget(self.layer_composition_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.layer_composition_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.layer_composition_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_animation_editor(self):
+        """Show animation curve editor dock"""
+        if not self.animation_editor_widget:
+            from .animation_curve_ui import AnimationCurveEditorWidget
+            self.animation_editor_widget = AnimationCurveEditorWidget()
+            dock = QDockWidget("Animation Curve Editor", self)
+            dock.setWidget(self.animation_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.animation_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.animation_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_material_editor(self):
+        """Show material editor dock"""
+        if not self.material_editor_widget:
+            from .material_editor_ui import MaterialEditorWidget
+            self.material_editor_widget = MaterialEditorWidget()
+            dock = QDockWidget("Material Editor", self)
+            dock.setWidget(self.material_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.material_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.material_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_scene_search(self):
+        """Show scene search dock"""
+        if not self.scene_search_widget:
+            from .scene_search_ui import SceneSearchWidget
+            self.scene_search_widget = SceneSearchWidget()
+            self.scene_search_widget.selection_changed.connect(self.on_search_selection_changed)
+            dock = QDockWidget("Scene Search & Filter", self)
+            dock.setWidget(self.scene_search_widget)
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.scene_search_widget.set_stage(self.stage_manager.stage)
+        else:
+            # Find and show existing dock
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.scene_search_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def on_search_selection_changed(self, prim_path: str):
+        """Handle search selection change"""
+        # Select prim in hierarchy tree
+        items = self.hierarchy_tree.findItems(prim_path, Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive, 0)
+        if items:
+            self.hierarchy_tree.setCurrentItem(items[0])
+            self.hierarchy_tree.scrollToItem(items[0])
+    
+    def toggle_hydra_rendering(self, checked: bool):
+        """Toggle between Hydra and OpenGL rendering"""
+        if not self.hydra_viewport:
+            QMessageBox.warning(self, "Hydra Not Available", 
+                              "Hydra 2.0 viewport is not available. Using OpenGL fallback.")
+            return
+        
+        self.use_hydra = checked
+        
+        if checked:
+            # Switch to Hydra
+            self.hydra_viewport.set_stage(self.stage_manager.stage)
+            if self.stage_manager.stage:
+                self.hydra_viewport.update_geometry(self.stage_manager.current_time)
+            self.setCentralWidget(self.hydra_viewport)
+            self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
+        else:
+            # Switch to OpenGL
+            self.setCentralWidget(self.viewport)
+            if self.stage_manager.stage:
+                self.viewport.update_geometry(self.stage_manager.current_time)
+            self.statusBar().showMessage("Using OpenGL rendering", 3000)
+    
+    def show_camera_manager(self):
+        """Show camera manager dock"""
+        if not self.camera_manager_widget:
+            from .camera_manager_ui import CameraManagerWidget
+            self.camera_manager_widget = CameraManagerWidget()
+            self.camera_manager_widget.camera_selected.connect(self.on_camera_selected)
+            dock = QDockWidget("Camera Management", self)
+            dock.setWidget(self.camera_manager_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.camera_manager_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.camera_manager_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_prim_properties(self):
+        """Show prim properties dock"""
+        if not self.prim_properties_widget:
+            from .prim_selection_ui import PrimPropertiesWidget
+            self.prim_properties_widget = PrimPropertiesWidget()
+            dock = QDockWidget("Prim Properties", self)
+            dock.setWidget(self.prim_properties_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.prim_selection_manager:
+                self.prim_properties_widget.set_selection_manager(self.prim_selection_manager)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.prim_properties_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_collection_editor(self):
+        """Show collection editor dock"""
+        if not self.collection_editor_widget:
+            from .collection_editor_ui import CollectionEditorWidget
+            self.collection_editor_widget = CollectionEditorWidget()
+            dock = QDockWidget("Collection Editor", self)
+            dock.setWidget(self.collection_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.collection_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.collection_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_primvar_editor(self):
+        """Show primvar editor dock"""
+        if not self.primvar_editor_widget:
+            from .primvar_editor_ui import PrimvarEditorWidget
+            self.primvar_editor_widget = PrimvarEditorWidget()
+            dock = QDockWidget("Primvar Editor", self)
+            dock.setWidget(self.primvar_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.primvar_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.primvar_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_render_settings_editor(self):
+        """Show render settings editor dock"""
+        if not self.render_settings_editor_widget:
+            from .render_settings_editor_ui import RenderSettingsEditorWidget
+            self.render_settings_editor_widget = RenderSettingsEditorWidget()
+            dock = QDockWidget("Render Settings Editor", self)
+            dock.setWidget(self.render_settings_editor_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.render_settings_editor_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.render_settings_editor_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def on_camera_selected(self, camera_path: str):
+        """Handle camera selection"""
+        # Could switch viewport to use this camera
+        self.statusBar().showMessage(f"Selected camera: {camera_path}", 2000)
+    
+    def show_multi_viewport(self):
+        """Show multi-viewport widget"""
+        if not self.multi_viewport_widget:
+            from .multi_viewport import MultiViewportWidget
+            self.multi_viewport_widget = MultiViewportWidget()
+            self.multi_viewport_widget.set_stage_manager(self.stage_manager)
+            # Replace central widget
+            self.setCentralWidget(self.multi_viewport_widget)
+        else:
+            self.setCentralWidget(self.multi_viewport_widget)
+    
+    def show_scene_comparison(self):
+        """Show scene comparison dock"""
+        if not self.scene_comparison_widget:
+            from .scene_comparison_ui import SceneComparisonWidget
+            self.scene_comparison_widget = SceneComparisonWidget()
+            dock = QDockWidget("Scene Comparison", self)
+            dock.setWidget(self.scene_comparison_widget)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.scene_comparison_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_batch_operations(self):
+        """Show batch operations dialog"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QListWidget
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Batch Operations")
+        dialog.setMinimumSize(400, 300)
+        
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Batch Operations"))
+        layout.addWidget(QLabel("Select prims from hierarchy, then choose operation:"))
+        
+        # Operation buttons
+        from .batch_operations import BatchOperationManager
+        if self.stage_manager and self.stage_manager.stage:
+            batch_mgr = BatchOperationManager(self.stage_manager.stage)
+            # Add batch operation buttons here
+            pass
+        
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
+    
+    def show_help(self):
+        """Show help dialog"""
+        from .help_system import HelpDialog
+        help_dialog = HelpDialog(self)
+        help_dialog.exec()
+    
+    def show_about(self):
+        """Show about dialog"""
+        QMessageBox.about(
+            self, "About xStage",
+            "<h2>xStage USD Viewer</h2>"
+            "<p>Professional USD viewer and converter for VFX pipelines</p>"
+            "<p>Version 0.1.0</p>"
+            "<p>Built with OpenUSD 25.11</p>"
+            "<p>© NOX VFX & Contributors</p>"
+        )
+    
+    def _add_tooltips(self):
+        """Add tooltips to UI elements"""
+        if not self.help_system:
+            return
+        
+        # Add tooltips to common widgets
+        if hasattr(self, 'hierarchy_tree'):
+            self.help_system.set_tooltip(self.hierarchy_tree, 'hierarchy')
+        if hasattr(self, 'viewport'):
+            self.help_system.set_tooltip(self.viewport, 'viewport')
+        if hasattr(self, 'timeline_slider'):
+            self.help_system.set_tooltip(self.timeline_slider, 'timeline')
+    
+    def show_stage_variables(self):
+        """Show stage variables dock"""
+        if not self.stage_variables_widget:
+            from .stage_variables_ui import StageVariablesWidget
+            self.stage_variables_widget = StageVariablesWidget()
+            dock = QDockWidget("Stage Variables", self)
+            dock.setWidget(self.stage_variables_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.stage_variables_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.stage_variables_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def on_hierarchy_item_double_clicked(self, item: QTreeWidgetItem, column: int):
+        """Handle double-click on hierarchy item for variant selection"""
+        prim_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not prim_path:
+            return
+        
+        # Check if it's a variant set item
+        if "::" in prim_path and not prim_path.startswith("/"):
+            # This is a variant set
+            parts = prim_path.split("::")
+            if len(parts) == 2:
+                prim_path_str, variant_set_name = parts
+                prim = self.stage_manager.stage.GetPrimAtPath(prim_path_str)
+                if prim:
+                    self.show_variant_selector(prim, variant_set_name)
+    
+    def show_variant_selector(self, prim: Usd.Prim, variant_set_name: str):
+        """Show dialog to select variant"""
+        if not USD_AVAILABLE:
+            return
+        
+        try:
+            from .variants import VariantManager
+            
+            variant_sets = prim.GetVariantSets()
+            variant_set = variant_sets.GetVariantSet(variant_set_name)
+            available_variants = variant_set.GetVariantNames()
+            current_selection = variant_set.GetVariantSelection()
+            
+            # Create simple selection dialog
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QLabel
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Select Variant: {variant_set_name}")
+            layout = QVBoxLayout()
+            
+            label = QLabel(f"Select variant for {variant_set_name}:")
+            layout.addWidget(label)
+            
+            list_widget = QListWidget()
+            for variant in available_variants:
+                list_widget.addItem(variant)
+                if variant == current_selection:
+                    list_widget.setCurrentItem(list_widget.item(list_widget.count() - 1))
+            layout.addWidget(list_widget)
+            
+            button_layout = QHBoxLayout()
+            ok_button = QPushButton("OK")
+            cancel_button = QPushButton("Cancel")
+            
+            def apply_variant():
+                selected = list_widget.currentItem()
+                if selected:
+                    variant_name = selected.text()
+                    VariantManager.set_variant_selection(prim, variant_set_name, variant_name)
+                    self.update_hierarchy()
+                    self.viewport.update_geometry(self.stage_manager.current_time)
+                dialog.accept()
+            
+            ok_button.clicked.connect(apply_variant)
+            cancel_button.clicked.connect(dialog.reject)
+            button_layout.addWidget(ok_button)
+            button_layout.addWidget(cancel_button)
+            layout.addLayout(button_layout)
+            
+            dialog.setLayout(layout)
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Variant Selection Error", f"Error selecting variant:\n{e}")
 
 
 def main():
