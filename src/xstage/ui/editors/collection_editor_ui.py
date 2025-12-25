@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from typing import Optional
 
-from .collections import CollectionManager
+from ...managers.collections import CollectionManager
 
 
 class CollectionEditorWidget(QWidget):

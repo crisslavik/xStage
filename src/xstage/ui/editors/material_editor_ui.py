@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from typing import Optional, Dict
 
-from .materials import MaterialManager
+from ...managers.materials import MaterialManager
 
 
 class MaterialEditorWidget(QWidget):

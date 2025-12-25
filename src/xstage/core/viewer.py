@@ -45,9 +45,9 @@ except ImportError:
 
 import numpy as np
 
-# Import UsdLux support if available
+# Import from reorganized structure
 try:
-    from .usd_lux_support import UsdLuxExtractor
+    from ..utils.usd_lux_support import UsdLuxExtractor
 except ImportError:
     UsdLuxExtractor = None
 
@@ -571,7 +571,7 @@ class USDStageManager:
         # Add color space info if available
         if USD_AVAILABLE:
             try:
-                from .color_space import ColorSpaceManager
+                from ..utils.color_space import ColorSpaceManager
                 default_color_space = ColorSpaceManager.get_default_color_space(self.stage)
                 if default_color_space:
                     info['default_color_space'] = default_color_space
@@ -868,13 +868,20 @@ class USDViewerWindow(QMainWindow):
         self.multi_viewport_widget = None
         self.scene_comparison_widget = None
         self.openexec_widget = None
+        self.annotations_widget = None
         self.prim_selection_manager = None
         self.undo_redo_manager = None
         self.help_system = None
         
-        # Initialize help system and add tooltips
-        from .help_system import HelpSystem
+        # Initialize managers
+        from ..utils.help_system import HelpSystem
+        from ..utils.recent_files import RecentFilesManager
+        from ..utils.bookmarks import BookmarkManager
+        
         self.help_system = HelpSystem()
+        self.recent_files_manager = RecentFilesManager()
+        self.bookmark_manager = BookmarkManager()
+        
         self._add_tooltips()
         
         self.init_ui()
@@ -888,7 +895,7 @@ class USDViewerWindow(QMainWindow):
         # Create central widget with viewport
         # Try to use Hydra viewport if available, fallback to OpenGL
         try:
-            from .hydra_viewport import HydraViewportWidget
+            from ..rendering.hydra_viewport import HydraViewportWidget
             self.hydra_viewport = HydraViewportWidget()
             self.hydra_viewport.set_stage_manager(self.stage_manager)
             self.viewport = ViewportWidget()  # Keep as fallback
@@ -941,6 +948,18 @@ class USDViewerWindow(QMainWindow):
         
         # View menu
         view_menu = menubar.addMenu("&View")
+        
+        # Recent Files submenu
+        recent_files_menu = view_menu.addMenu("&Recent Files")
+        self.recent_files_actions = []
+        self.update_recent_files_menu()
+        
+        # Bookmarks submenu
+        bookmarks_menu = view_menu.addMenu("&Bookmarks")
+        self.bookmarks_actions = []
+        self.update_bookmarks_menu()
+        
+        view_menu.addSeparator()
         
         grid_action = QAction("Show &Grid", self, checkable=True)
         grid_action.setChecked(True)
@@ -1027,6 +1046,12 @@ class USDViewerWindow(QMainWindow):
         openexec_action = QAction("&OpenExec (Computed Attributes)...", self)
         openexec_action.triggered.connect(self.show_openexec)
         tools_menu.addAction(openexec_action)
+        
+        tools_menu.addSeparator()
+        
+        annotations_action = QAction("&Annotations...", self)
+        annotations_action.triggered.connect(self.show_annotations)
+        tools_menu.addAction(annotations_action)
         
         tools_menu.addSeparator()
         
@@ -1206,7 +1231,7 @@ class USDViewerWindow(QMainWindow):
             
             # Initialize payload manager
             if USD_AVAILABLE:
-                from .payloads import PayloadManager
+                from ..managers.payloads import PayloadManager
                 self.payload_manager = PayloadManager(self.stage_manager.stage)
             
             # Update UI
@@ -1265,17 +1290,24 @@ class USDViewerWindow(QMainWindow):
                 self.stage_variables_widget.set_stage(self.stage_manager.stage)
             if self.openexec_widget:
                 self.openexec_widget.set_stage(self.stage_manager.stage)
+            if self.annotations_widget:
+                self.annotations_widget.set_stage(self.stage_manager.stage)
             if self.multi_viewport_widget:
                 self.multi_viewport_widget.set_stage_manager(self.stage_manager)
             
+            # Update recent files
+            if filepath:
+                self.recent_files_manager.add_file(filepath, "usd")
+                self.update_recent_files_menu()
+            
             # Initialize undo/redo
             if USD_AVAILABLE:
-                from .undo_redo import UndoRedoManager
+                from ..managers.undo_redo import UndoRedoManager
                 self.undo_redo_manager = UndoRedoManager()
             
             # Initialize prim selection manager
             if USD_AVAILABLE and self.stage_manager.stage:
-                from .prim_selection import PrimSelectionManager
+                from ..managers.prim_selection import PrimSelectionManager
                 self.prim_selection_manager = PrimSelectionManager(self.stage_manager.stage)
             
             self.statusBar().showMessage(f"Loaded: {filepath}", 5000)
@@ -1378,7 +1410,7 @@ class USDViewerWindow(QMainWindow):
         
     def import_convert_file(self):
         """Import and convert 3D file to USD"""
-        from .converter_ui import ConverterDialog
+        from ..converters.converter_ui import ConverterDialog
         dialog = ConverterDialog(self)
         if dialog.exec():
             output_path = dialog.output_path_edit.text()
@@ -1464,7 +1496,7 @@ class USDViewerWindow(QMainWindow):
             return
         
         try:
-            from .validation import USDValidator
+            from ..utils.validation import ValidationManager as USDValidator
             
             validator = USDValidator()
             result = validator.validate_stage(self.stage_manager.stage)
@@ -1524,7 +1556,7 @@ class USDViewerWindow(QMainWindow):
     def show_layer_composition(self):
         """Show layer composition dock"""
         if not self.layer_composition_widget:
-            from .layer_composition_ui import LayerCompositionWidget
+            from ..ui.editors.layer_composition_ui import LayerCompositionWidget
             self.layer_composition_widget = LayerCompositionWidget()
             dock = QDockWidget("Layer Composition", self)
             dock.setWidget(self.layer_composition_widget)
@@ -1542,7 +1574,7 @@ class USDViewerWindow(QMainWindow):
     def show_animation_editor(self):
         """Show animation curve editor dock"""
         if not self.animation_editor_widget:
-            from .animation_curve_ui import AnimationCurveEditorWidget
+            from ..ui.editors.animation_curve_ui import AnimationCurveEditorWidget
             self.animation_editor_widget = AnimationCurveEditorWidget()
             dock = QDockWidget("Animation Curve Editor", self)
             dock.setWidget(self.animation_editor_widget)
@@ -1560,7 +1592,7 @@ class USDViewerWindow(QMainWindow):
     def show_material_editor(self):
         """Show material editor dock"""
         if not self.material_editor_widget:
-            from .material_editor_ui import MaterialEditorWidget
+            from ..ui.editors.material_editor_ui import MaterialEditorWidget
             self.material_editor_widget = MaterialEditorWidget()
             dock = QDockWidget("Material Editor", self)
             dock.setWidget(self.material_editor_widget)
@@ -1578,7 +1610,7 @@ class USDViewerWindow(QMainWindow):
     def show_scene_search(self):
         """Show scene search dock"""
         if not self.scene_search_widget:
-            from .scene_search_ui import SceneSearchWidget
+            from ..ui.editors.scene_search_ui import SceneSearchWidget
             self.scene_search_widget = SceneSearchWidget()
             self.scene_search_widget.selection_changed.connect(self.on_search_selection_changed)
             dock = QDockWidget("Scene Search & Filter", self)
@@ -1628,7 +1660,7 @@ class USDViewerWindow(QMainWindow):
     def show_camera_manager(self):
         """Show camera manager dock"""
         if not self.camera_manager_widget:
-            from .camera_manager_ui import CameraManagerWidget
+            from ..ui.editors.camera_manager_ui import CameraManagerWidget
             self.camera_manager_widget = CameraManagerWidget()
             self.camera_manager_widget.camera_selected.connect(self.on_camera_selected)
             dock = QDockWidget("Camera Management", self)
@@ -1646,7 +1678,7 @@ class USDViewerWindow(QMainWindow):
     def show_prim_properties(self):
         """Show prim properties dock"""
         if not self.prim_properties_widget:
-            from .prim_selection_ui import PrimPropertiesWidget
+            from ..ui.editors.prim_selection_ui import PrimPropertiesWidget
             self.prim_properties_widget = PrimPropertiesWidget()
             dock = QDockWidget("Prim Properties", self)
             dock.setWidget(self.prim_properties_widget)
@@ -1663,7 +1695,7 @@ class USDViewerWindow(QMainWindow):
     def show_collection_editor(self):
         """Show collection editor dock"""
         if not self.collection_editor_widget:
-            from .collection_editor_ui import CollectionEditorWidget
+            from ..ui.editors.collection_editor_ui import CollectionEditorWidget
             self.collection_editor_widget = CollectionEditorWidget()
             dock = QDockWidget("Collection Editor", self)
             dock.setWidget(self.collection_editor_widget)
@@ -1680,7 +1712,7 @@ class USDViewerWindow(QMainWindow):
     def show_primvar_editor(self):
         """Show primvar editor dock"""
         if not self.primvar_editor_widget:
-            from .primvar_editor_ui import PrimvarEditorWidget
+            from ..ui.editors.primvar_editor_ui import PrimvarEditorWidget
             self.primvar_editor_widget = PrimvarEditorWidget()
             dock = QDockWidget("Primvar Editor", self)
             dock.setWidget(self.primvar_editor_widget)
@@ -1697,7 +1729,7 @@ class USDViewerWindow(QMainWindow):
     def show_render_settings_editor(self):
         """Show render settings editor dock"""
         if not self.render_settings_editor_widget:
-            from .render_settings_editor_ui import RenderSettingsEditorWidget
+            from ..ui.editors.render_settings_editor_ui import RenderSettingsEditorWidget
             self.render_settings_editor_widget = RenderSettingsEditorWidget()
             dock = QDockWidget("Render Settings Editor", self)
             dock.setWidget(self.render_settings_editor_widget)
@@ -1719,7 +1751,7 @@ class USDViewerWindow(QMainWindow):
     def show_multi_viewport(self):
         """Show multi-viewport widget"""
         if not self.multi_viewport_widget:
-            from .multi_viewport import MultiViewportWidget
+            from ..multi_viewport import MultiViewportWidget
             self.multi_viewport_widget = MultiViewportWidget()
             self.multi_viewport_widget.set_stage_manager(self.stage_manager)
             # Replace central widget
@@ -1730,7 +1762,7 @@ class USDViewerWindow(QMainWindow):
     def show_scene_comparison(self):
         """Show scene comparison dock"""
         if not self.scene_comparison_widget:
-            from .scene_comparison_ui import SceneComparisonWidget
+            from ..ui.editors.scene_comparison_ui import SceneComparisonWidget
             self.scene_comparison_widget = SceneComparisonWidget()
             dock = QDockWidget("Scene Comparison", self)
             dock.setWidget(self.scene_comparison_widget)
@@ -1755,7 +1787,7 @@ class USDViewerWindow(QMainWindow):
         layout.addWidget(QLabel("Select prims from hierarchy, then choose operation:"))
         
         # Operation buttons
-        from .batch_operations import BatchOperationManager
+        from ..managers.batch_operations import BatchOperationManager
         if self.stage_manager and self.stage_manager.stage:
             batch_mgr = BatchOperationManager(self.stage_manager.stage)
             # Add batch operation buttons here
@@ -1770,14 +1802,14 @@ class USDViewerWindow(QMainWindow):
     
     def show_help(self):
         """Show help dialog"""
-        from .help_system import HelpDialog
+        from ..utils.help_system import HelpDialog
         help_dialog = HelpDialog(self)
         help_dialog.exec()
     
     def show_openexec(self):
         """Show OpenExec dock"""
         if not self.openexec_widget:
-            from .openexec_ui import OpenExecWidget
+            from ..ui.editors.openexec_ui import OpenExecWidget
             self.openexec_widget = OpenExecWidget()
             dock = QDockWidget("OpenExec - Computed Attributes", self)
             dock.setWidget(self.openexec_widget)
@@ -1790,6 +1822,142 @@ class USDViewerWindow(QMainWindow):
                     dock.show()
                     dock.raise_()
                     break
+    
+    def show_annotations(self):
+        """Show annotations dock"""
+        if not self.annotations_widget:
+            from ..ui.editors.annotations_ui import AnnotationsWidget
+            self.annotations_widget = AnnotationsWidget()
+            dock = QDockWidget("Annotations", self)
+            dock.setWidget(self.annotations_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.annotations_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.annotations_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def update_recent_files_menu(self):
+        """Update recent files menu"""
+        # Clear existing actions
+        for action in self.recent_files_actions:
+            if action:
+                action.deleteLater()
+        self.recent_files_actions.clear()
+        
+        # Get recent files menu
+        recent_files_menu = None
+        view_menu = None
+        for action in self.menuBar().actions():
+            if action.menu() and "View" in action.menu().title():
+                view_menu = action.menu()
+                break
+        
+        if view_menu:
+            for action in view_menu.actions():
+                if action.menu() and "Recent Files" in action.menu().title():
+                    recent_files_menu = action.menu()
+                    break
+        
+        if not recent_files_menu:
+            return
+        
+        recent_files_menu.clear()
+        
+        # Add recent files
+        recent_files = self.recent_files_manager.get_recent_files(limit=10)
+        for recent_file in recent_files:
+            file_path = Path(recent_file.path)
+            display_name = file_path.name
+            if recent_file.stage_name:
+                display_name = f"{recent_file.stage_name} - {display_name}"
+            
+            action = QAction(display_name, self)
+            action.setData(recent_file.path)
+            action.triggered.connect(lambda checked, path=recent_file.path: self.load_recent_file(path))
+            recent_files_menu.addAction(action)
+            self.recent_files_actions.append(action)
+        
+        if not recent_files:
+            no_files_action = QAction("No recent files", self)
+            no_files_action.setEnabled(False)
+            recent_files_menu.addAction(no_files_action)
+    
+    def load_recent_file(self, filepath: str):
+        """Load a recent file"""
+        if Path(filepath).exists():
+            self.load_usd_file(filepath)
+        else:
+            QMessageBox.warning(self, "File Not Found", f"File not found: {filepath}")
+            self.recent_files_manager.remove_file(filepath)
+            self.update_recent_files_menu()
+    
+    def update_bookmarks_menu(self):
+        """Update bookmarks menu"""
+        # Clear existing actions
+        for action in self.bookmarks_actions:
+            if action:
+                action.deleteLater()
+        self.bookmarks_actions.clear()
+        
+        # Get bookmarks menu
+        bookmarks_menu = None
+        view_menu = None
+        for action in self.menuBar().actions():
+            if action.menu() and "View" in action.menu().title():
+                view_menu = action.menu()
+                break
+        
+        if view_menu:
+            for action in view_menu.actions():
+                if action.menu() and "Bookmarks" in action.menu().title():
+                    bookmarks_menu = action.menu()
+                    break
+        
+        if not bookmarks_menu:
+            return
+        
+        bookmarks_menu.clear()
+        
+        # Add bookmarks for current stage
+        if self.stage_manager and self.stage_manager.stage:
+            stage_path = self.stage_manager.stage.GetRootLayer().identifier
+            bookmarks = self.bookmark_manager.get_bookmarks_for_stage(stage_path)
+            
+            for bookmark in bookmarks:
+                action = QAction(bookmark.name, self)
+                action.setData(bookmark.id)
+                action.triggered.connect(lambda checked, bm_id=bookmark.id: self.load_bookmark(bm_id))
+                bookmarks_menu.addAction(action)
+                self.bookmarks_actions.append(action)
+        
+        if not self.bookmarks_actions:
+            no_bookmarks_action = QAction("No bookmarks", self)
+            no_bookmarks_action.setEnabled(False)
+            bookmarks_menu.addAction(no_bookmarks_action)
+    
+    def load_bookmark(self, bookmark_id: str):
+        """Load a bookmark"""
+        bookmark = next((bm for bm in self.bookmark_manager.bookmarks if bm.id == bookmark_id), None)
+        if not bookmark:
+            return
+        
+        # Load stage if different
+        if bookmark.stage_path and self.stage_manager.stage:
+            current_path = self.stage_manager.stage.GetRootLayer().identifier
+            if bookmark.stage_path != current_path:
+                self.load_usd_file(bookmark.stage_path)
+        
+        # Navigate to bookmark
+        if bookmark.prim_path and self.stage_manager.stage:
+            prim = self.stage_manager.stage.GetPrimAtPath(bookmark.prim_path)
+            if prim:
+                # Select prim in hierarchy
+                # Could also frame camera if it's a camera bookmark
+                pass
     
     def show_about(self):
         """Show about dialog"""
@@ -1818,7 +1986,7 @@ class USDViewerWindow(QMainWindow):
     def show_stage_variables(self):
         """Show stage variables dock"""
         if not self.stage_variables_widget:
-            from .stage_variables_ui import StageVariablesWidget
+            from ..ui.editors.stage_variables_ui import StageVariablesWidget
             self.stage_variables_widget = StageVariablesWidget()
             dock = QDockWidget("Stage Variables", self)
             dock.setWidget(self.stage_variables_widget)
@@ -1854,7 +2022,7 @@ class USDViewerWindow(QMainWindow):
             return
         
         try:
-            from .variants import VariantManager
+            from ..managers.variants import VariantManager
             
             variant_sets = prim.GetVariantSets()
             variant_set = variant_sets.GetVariantSet(variant_set_name)

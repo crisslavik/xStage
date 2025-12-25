@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from typing import Optional
 
-from .layer_composition import LayerCompositionManager
+from ...managers.layer_composition import LayerCompositionManager
 
 
 class LayerCompositionWidget(QWidget):

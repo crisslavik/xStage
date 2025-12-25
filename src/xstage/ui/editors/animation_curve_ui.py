@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPainter, QPen, QColor
 from typing import Optional, List, Dict
 
-from .animation_curves import AnimationCurveManager
+from ...managers.animation_curves import AnimationCurveManager
 
 
 class CurveGraphWidget(QWidget):

@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from pathlib import Path
 from typing import Optional
 
-from .converter import USDConverter, ConversionOptions
+from ...converters.converter import USDConverter, ConversionOptions
 
 
 class ConversionThread(QThread):

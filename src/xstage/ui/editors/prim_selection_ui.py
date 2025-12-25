@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from typing import Optional, List
 from pxr import Gf, UsdGeom
 
-from .prim_selection import PrimSelectionManager
+from ...managers.prim_selection import PrimSelectionManager
 
 
 class PrimPropertiesWidget(QWidget):
@@ -163,7 +163,7 @@ class PrimPropertiesWidget(QWidget):
         
         # Check for OpenExec support
         try:
-            from .openexec_support import OpenExecManager
+            from ...managers.openexec_support import OpenExecManager
             if self.selection_manager and self.selection_manager.stage:
                 openexec_mgr = OpenExecManager(self.selection_manager.stage)
                 
