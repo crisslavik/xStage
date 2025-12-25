@@ -111,9 +111,15 @@ src/xstage/
 
 ### Before:
 ```python
-from xstage.viewer import USDViewerWindow
-from xstage.hydra_viewport import HydraViewportWidget
-from xstage.materials import MaterialManager
+# OLD (before reorganization):
+# from xstage.viewer import USDViewerWindow
+# from xstage.hydra_viewport import HydraViewportWidget
+# from xstage.materials import MaterialManager
+
+# NEW (after reorganization):
+from xstage.core.viewer import USDViewerWindow
+from xstage.rendering.hydra_viewport import HydraViewportWidget
+from xstage.managers.materials import MaterialManager
 ```
 
 ### After:

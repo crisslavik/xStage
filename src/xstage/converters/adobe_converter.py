@@ -1,6 +1,16 @@
 """
 Enhanced USD Converter with Adobe USD Fileformat Plugins
-Supports native FBX, improved Alembic, and MaterialX integration
+Supports native FBX, OBJ, glTF, STL, PLY, and Substance (SBSAR) formats
+
+Adobe USD Fileformat Plugins provide native reading support for:
+- FBX (Filmbox) - Primary focus, full scene support
+- OBJ (Wavefront) - Enhanced with material support
+- glTF/GLB - Enhanced with PBR materials
+- STL (Stereolithography) - Native support
+- PLY (Polygon File Format) - Native support
+- Substance (SBSAR) - Adobe's proprietary material format
+
+See: https://github.com/adobe/USD-Fileformat-plugins
 """
 
 import os
@@ -386,36 +396,83 @@ class AdobeUSDConverter(BaseConverter):
             return False
             
     def _convert_alembic_native(self, input_path: str, output_path: str, progress_callback=None) -> bool:
-        """Convert Alembic using USD's native Alembic plugin"""
+        """
+        Convert Alembic using USD's native Alembic plugin (usdAbc)
+        Enhanced with better time sample handling and error recovery
+        """
         try:
             if progress_callback:
                 progress_callback(30, "Reading Alembic with USD plugin...")
+                
+            # Check plugin availability first
+            from pxr import Plug
+            registry = Plug.Registry()
+            alembic_plugin = registry.GetPluginWithName('usdAbc')
+            
+            if not alembic_plugin:
+                if progress_callback:
+                    progress_callback(0, "USD Alembic plugin (usdAbc) not found")
+                return False
+            
+            # Load plugin if not already loaded
+            if not alembic_plugin.isLoaded:
+                try:
+                    alembic_plugin.Load()
+                except Exception as e:
+                    if progress_callback:
+                        progress_callback(0, f"Failed to load Alembic plugin: {e}")
+                    return False
                 
             # USD can directly open Alembic files if the plugin is available
             source_stage = Usd.Stage.Open(input_path)
             
             if not source_stage:
+                if progress_callback:
+                    progress_callback(0, "Failed to open Alembic file")
                 return False
-                
+            
+            # Get time range for progress reporting
+            start_time = source_stage.GetStartTimeCode()
+            end_time = source_stage.GetEndTimeCode()
+            has_animation = start_time != end_time
+            
             if progress_callback:
-                progress_callback(60, "Creating USD stage...")
+                if has_animation:
+                    progress_callback(50, f"Processing animated Alembic (frames {start_time}-{end_time})...")
+                else:
+                    progress_callback(50, "Processing Alembic data...")
                 
             # Create output stage
             dest_stage = Usd.Stage.CreateNew(output_path)
             self._apply_stage_settings(dest_stage)
             
-            # Copy content
-            if progress_callback:
-                progress_callback(80, "Copying Alembic data to USD...")
+            # Handle time samples based on options
+            if self.options.time_samples and has_animation:
+                if progress_callback:
+                    progress_callback(70, "Exporting with time samples...")
                 
-            # Use USD's layer composition
-            dest_stage.GetRootLayer().subLayerPaths.append(source_stage.GetRootLayer().identifier)
-            
-            # Flatten if needed
-            if self.options.time_samples:
-                # Export with time samples
-                dest_stage.Export(output_path, args={'flatten': True})
+                # Export with time samples preserved
+                # Use reference method to preserve animation
+                dest_stage.GetRootLayer().subLayerPaths.append(source_stage.GetRootLayer().identifier)
+                
+                # Set time range
+                dest_stage.SetStartTimeCode(start_time)
+                dest_stage.SetEndTimeCode(end_time)
+                dest_stage.SetFramesPerSecond(self.options.fps)
+                
+                # Export/flatten based on preference
+                if self.options.preserve_hierarchy:
+                    dest_stage.GetRootLayer().Save()
+                else:
+                    # Flatten to single layer
+                    flattened = UsdUtils.StageCache.Get().Insert(dest_stage)
+                    flattened.Export(output_path)
             else:
+                if progress_callback:
+                    progress_callback(70, "Flattening to single time sample...")
+                
+                # Flatten to default time
+                self._copy_stage_content(source_stage, dest_stage, Usd.TimeCode.Default())
                 dest_stage.GetRootLayer().Save()
                 
             if progress_callback:
@@ -425,6 +482,8 @@ class AdobeUSDConverter(BaseConverter):
             
         except Exception as e:
             print(f"Native Alembic conversion failed: {e}")
+            import traceback
+            traceback.print_exc()
             return False
             
     def _convert_alembic_usdcat(self, input_path: str, output_path: str, progress_callback=None) -> bool:
