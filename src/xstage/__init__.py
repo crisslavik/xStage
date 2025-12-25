@@ -1,91 +1,153 @@
 """
-xStage - Extended USD Viewer
-Professional USD viewer with pipeline integration
+xStage - Extended USD Viewer for Production Pipelines
 """
 
-__version__ = "0.1.0"
-__author__ = "NOX VFX & Contributors"
+# Core
+from .core import (
+    USDViewerWindow,
+    ViewerSettings,
+    USDStageManager,
+    ViewportWidget,
+)
 
-from .viewer import USDViewerWindow, ViewportWidget, ViewerSettings, USDStageManager
-from .viewport import ViewportWidget
-from .orientation import AxisOrientationWidget
-from .converter import USDConverter, ConversionOptions
-from .converter_ui import ConverterDialog
+# Rendering
+from .rendering import (
+    HydraViewportWidget,
+)
+
+# UI
+from .ui.widgets import (
+    AxisOrientationWidget,
+)
+
+from .ui.editors import (
+    AnimationCurveEditorWidget,
+    AnnotationsWidget,
+    CameraManagerWidget,
+    CollectionEditorWidget,
+    ConverterDialog,
+    LayerCompositionWidget,
+    MaterialEditorWidget,
+    OpenExecWidget,
+    PrimPropertiesWidget,
+    PrimvarEditorWidget,
+    RenderSettingsEditorWidget,
+    SceneComparisonWidget,
+    SceneSearchWidget,
+    StageVariablesWidget,
+)
+
+# Managers
+from .managers import (
+    AnimationCurveManager,
+    BatchOperationManager,
+    CameraManager,
+    CollectionManager,
+    CoordinateSystemManager,
+    LayerCompositionManager,
+    MaterialManager,
+    NamespaceEditor,
+    OpenExecManager,
+    PayloadManager,
+    PrimSelectionManager,
+    SceneComparator,
+    SceneSearchManager,
+    StageVariableManager,
+    UndoRedoManager,
+    VariantManager,
+)
+
+# Converters
+from .converters import (
+    USDConverter,
+    ConversionOptions,
+    ConverterDialog as ConverterDialogClass,
+)
+
+# Utils
+from .utils import (
+    AnnotationManager,
+    BookmarkManager,
+    ColorSpaceManager,
+    HelpSystem,
+    HelpDialog,
+    LightVisualization,
+    PerformanceProfiler,
+    PipelineIntegration,
+    ProgressReporter,
+    ProgressDialogManager,
+    RecentFilesManager,
+    UsdLuxExtractor,
+    ValidationManager,
+)
+
+# Config
 from .config import AppConfig
 
-# New feature modules
-from .usd_lux_support import UsdLuxExtractor
-from .collections import CollectionManager
-from .variants import VariantManager
-from .materials import MaterialManager
-from .validation import USDValidator
-from .payloads import PayloadManager
-from .color_space import ColorSpaceManager
-
-# High priority feature modules
-from .hydra_viewport import HydraViewportWidget
-from .layer_composition import LayerCompositionManager
-from .layer_composition_ui import LayerCompositionWidget
-from .animation_curves import AnimationCurveManager
-from .animation_curve_ui import AnimationCurveEditorWidget
-from .material_editor_ui import MaterialEditorWidget
-from .scene_search import SceneSearchManager
-from .scene_search_ui import SceneSearchWidget
+# Multi-viewport
+from .multi_viewport import MultiViewportWidget
 
 __all__ = [
+    # Core
     "USDViewerWindow",
-    "ViewportWidget",
     "ViewerSettings",
     "USDStageManager",
-    "AxisOrientationWidget",
-    "USDConverter",
-    "ConversionOptions",
-    "AppConfig",
-    # New features
-    "UsdLuxExtractor",
-    "CollectionManager",
-    "VariantManager",
-    "MaterialManager",
-    "USDValidator",
-    "PayloadManager",
-    "ColorSpaceManager",
-    # High priority features
+    "ViewportWidget",
+    # Rendering
     "HydraViewportWidget",
-    "LayerCompositionManager",
-    "LayerCompositionWidget",
-    "AnimationCurveManager",
+    # UI Widgets
+    "AxisOrientationWidget",
+    # UI Editors
     "AnimationCurveEditorWidget",
-    "MaterialEditorWidget",
-    "SceneSearchManager",
-    "SceneSearchWidget",
-    # Medium priority features
-    "CameraManager",
+    "AnnotationsWidget",
     "CameraManagerWidget",
-    "PrimSelectionManager",
-    "PrimPropertiesWidget",
-    "LightVisualization",
     "CollectionEditorWidget",
+    "ConverterDialog",
+    "LayerCompositionWidget",
+    "MaterialEditorWidget",
+    "OpenExecWidget",
+    "PrimPropertiesWidget",
     "PrimvarEditorWidget",
     "RenderSettingsEditorWidget",
-    "CoordinateSystemManager",
-    "NamespaceEditor",
-    "StageVariableManager",
+    "SceneComparisonWidget",
+    "SceneSearchWidget",
     "StageVariablesWidget",
-    # Converter and pipeline
+    # Managers
+    "AnimationCurveManager",
+    "BatchOperationManager",
+    "CameraManager",
+    "CollectionManager",
+    "CoordinateSystemManager",
+    "LayerCompositionManager",
+    "MaterialManager",
+    "NamespaceEditor",
+    "OpenExecManager",
+    "PayloadManager",
+    "PrimSelectionManager",
+    "SceneComparator",
+    "SceneSearchManager",
+    "StageVariableManager",
+    "UndoRedoManager",
+    "VariantManager",
+    # Converters
     "USDConverter",
     "ConversionOptions",
-    "ConverterDialog",
-    "PipelineIntegration",
-    # Advanced features
-    "MultiViewportWidget",
-    "UndoRedoManager",
-    "SceneComparator",
-    "SceneComparisonWidget",
-    "BatchOperationManager",
-    "PerformanceProfiler",
+    # Utils
+    "AnnotationManager",
+    "BookmarkManager",
+    "ColorSpaceManager",
     "HelpSystem",
+    "HelpDialog",
+    "LightVisualization",
+    "PerformanceProfiler",
+    "PipelineIntegration",
     "ProgressReporter",
-    # OpenExec
-    "OpenExecManager",
-    "OpenExecWidget",
+    "ProgressDialogManager",
+    "RecentFilesManager",
+    "UsdLuxExtractor",
+    "ValidationManager",
+    # Config
+    "AppConfig",
+    # Multi-viewport
+    "MultiViewportWidget",
 ]

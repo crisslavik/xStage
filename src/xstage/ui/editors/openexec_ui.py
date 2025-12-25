@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from typing import Optional
 
-from .openexec_support import OpenExecManager
+from ...managers.openexec_support import OpenExecManager
 
 
 class OpenExecWidget(QWidget):
@@ -138,7 +138,7 @@ class OpenExecWidget(QWidget):
             return
         
         try:
-            from .progress_manager import ProgressDialogManager
+            from ...utils.progress_manager import ProgressDialogManager
             
             progress_mgr = ProgressDialogManager(self)
             reporter = progress_mgr.show_progress("Computing Extents...", cancelable=False)

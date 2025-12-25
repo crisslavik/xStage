@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from typing import Optional
 
-from .stage_variables import StageVariableManager
+from ...managers.stage_variables import StageVariableManager
 
 
 class StageVariablesWidget(QWidget):

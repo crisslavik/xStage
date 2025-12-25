@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from typing import Optional
 
-from .camera_manager import CameraManager
+from ...managers.camera_manager import CameraManager
 
 
 class CameraManagerWidget(QWidget):

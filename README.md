@@ -12,7 +12,7 @@
   [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](...)
   [![OpenUSD](https://img.shields.io/badge/OpenUSD-25.11-blue.svg)](...)
   
-  [Features](#features) • [Install](#install) • [Docs](#docs) • [Community](#community)
+  [Features](#-features) • [Install](#-installation) • [Quick Start](#-quick-start) • [Docs](#-documentation)
   
   <img src="docs/assets/screenshot.png" alt="xStage Screenshot" width="800"/>
 </div>
@@ -21,71 +21,108 @@
 
 ## 🎬 What is xStage?
 
-**xStage** is a professional USD viewer built for VFX pipelines. Think `usdview`, but with the features production demands.
+**xStage** is a professional, production-ready USD viewer and converter built for VFX pipelines. It combines the power of OpenUSD with an intuitive interface and comprehensive toolset designed for real-world production workflows.
+
 ```bash
-# Install
-pip install xstage
+# View USD files
+xstage scene.usd
 
-# Run
-xstage my-scene.usd
+# Convert FBX to USD with scale correction
+xstage model.fbx --export output.usd --scale 0.01
 
-# With scale correction
-xstage model.fbx --scale 0.01
-
-# With axis conversion
+# Convert with axis correction
 xstage imported.obj --up-axis Z --flip-y
 ```
 
+---
+
 ## ⚡ Why xStage?
 
-| Feature | xStage | usdview | Commercial |
-|---------|--------|---------|------------|
+| Feature | xStage | usdview | Commercial Tools |
+|---------|--------|---------|------------------|
 | **Open Source** | ✅ | ✅ | ❌ |
-| **Scene Scale** | ✅ | ❌ | ✅ |
+| **Hydra 2.0 Rendering** | ✅ | ✅ | ⚠️ |
+| **Scene Scale Control** | ✅ | ❌ | ✅ |
 | **Axis Orientation** | ✅ | ❌ | ✅ |
-| **Measured Grid** | ✅ | ❌ | ✅ |
-| **Pipeline Tools** | ✅ | ❌ | ✅ |
-| **Plugin System** | ✅ | ❌ | ✅ |
-| **Hydra 2.0** | ✅ | ✅ | ⚠️ |
+| **Format Converter** | ✅ (8+ formats) | ❌ | ✅ |
+| **Layer Composition** | ✅ | ⚠️ | ✅ |
+| **Animation Editor** | ✅ | ❌ | ✅ |
+| **Material Editor** | ✅ | ❌ | ✅ |
+| **Multi-Viewport** | ✅ | ❌ | ✅ |
+| **Scene Comparison** | ✅ | ❌ | ✅ |
+| **Pipeline Integration** | ✅ | ❌ | ✅ |
+| **OpenExec Support** | ✅ | ❌ | ⚠️ |
+
+---
 
 ## 🌟 Features
 
-### Extended Viewing
-- 📏 **Scene Scale Control** - Fix imports with wrong units (mm→m, cm→m)
-- 🔄 **Axis Orientation** - Handle Y-up/Z-up, flipped axes
-- 📐 **Measured Grid** - Houdini-style reference grid with meters
-- 🎬 **Timeline** - Full animation playback
+### 🎬 Core Viewer
+- **Hydra 2.0 GPU Rendering** - Blazing fast, GPU-accelerated rendering with proper material support
+- **OpenGL Fallback** - Reliable fallback rendering for compatibility
+- **Scene Hierarchy** - Full scene graph navigation with icons and indicators
+- **Timeline & Playback** - Full animation timeline with scrubbing and playback controls
+- **Camera Controls** - Intuitive rotate, pan, zoom with frame-all support
+- **Measured Grid** - Houdini-style reference grid with real-world units
+- **Payload Management** - Load/unload payloads for performance optimization
 
-### Production Ready
-- 🚀 **Hydra 2.0** - Blazing fast rendering
-- 🔌 **Plugins** - Extend with custom tools
-- 📊 **Pipeline Integration** - ShotGrid, Nuke, Houdini
-- ✅ **Validation** - Built-in USD quality checks
+### 🎨 Editing & Management
+- **Layer Composition** - Visualize and manage USD layer stack (subLayers, references, payloads)
+- **Animation Curve Editor** - Edit animation curves with graph editor and keyframe manipulation
+- **Material Editor** - Edit material properties, shader networks, and assignments
+- **Prim Properties** - Edit transforms, attributes, and prim properties
+- **Collection Editor** - Manage collection membership and material bindings
+- **Primvar Editor** - Edit primvar values and interpolation modes
+- **Render Settings** - Configure render settings, cameras, and AOVs
+- **Namespace Editing** - Rename and move prims with namespace management
 
-### Format Support
-- **View**: USD, USDA, USDC, USDZ
-- **Import**: FBX, OBJ, glTF, Alembic, STL, PLY
-- **Export**: All USD formats
+### 🔍 Search & Navigation
+- **Scene Graph Search** - Advanced search and filtering by name, type, path, metadata
+- **Multi-Viewport** - Professional multi-view workflow (perspective, top, front, side)
+- **Camera Management** - Switch between cameras, edit properties, create new cameras
+- **Bookmarks** - Quick access to frequently used prims and locations
+
+### 🔄 Conversion & Import
+- **Comprehensive Converter** - Convert 8+ formats to USD:
+  - **FBX** → USD (multiple conversion methods)
+  - **OBJ** → USD
+  - **Alembic (ABC)** → USD
+  - **glTF/GLB** → USD
+  - **STL** → USD
+  - **PLY** → USD
+  - **Collada (DAE)** → USD
+  - **3DS** → USD
+- **Batch Conversion** - Process multiple files at once
+- **Progress Reporting** - Real-time progress bars for long operations
+- **Conversion Options** - Scale, axis correction, material export, UV/normal export
+
+### 🚀 Advanced Features
+- **Undo/Redo System** - Safe editing with full undo/redo support
+- **Scene Comparison/Diff** - Compare two USD stages side-by-side
+- **Batch Operations** - Process multiple prims simultaneously
+- **Performance Profiling** - Track performance metrics and optimization
+- **OpenExec Support** - Computed attributes and automatic extent calculations
+- **Stage Variables** - Manage stage variables for dynamic asset paths
+- **Coordinate Systems** - Support for coordinate system bindings
+- **Variant Sets** - View and switch variant selections
+- **USD Validation** - Built-in USD compliance checking
+
+### 🔗 Pipeline Integration
+- **Pipeline Configuration** - Easy integration with VFX pipelines
+- **Asset Path Management** - Standard asset path resolution
+- **Shot Stage Creation** - Create standard shot structures
+- **Nuke/Houdini Export** - Optimized export for pipeline tools
+
+### 📚 Help & Documentation
+- **Help System** - In-app help with context-sensitive tooltips
+- **Tooltips** - Comprehensive tooltips for all UI elements
+- **Documentation** - Complete user documentation
+
+---
 
 ## 🚀 Quick Start
-```bash
-# Basic viewing
-xstage scene.usd
 
-# Fix scale (FBX from cm to meters)
-xstage model.fbx --scale 0.01
-
-# Convert axis (OBJ Y-up to Z-up)
-xstage mesh.obj --up-axis Z
-
-# Flip inverted axis
-xstage broken.fbx --flip-y
-
-# Combine fixes
-xstage import.obj --scale 0.001 --up-axis Z --flip-z
-```
-
-## 📦 Installation
+### Installation
 
 **PyPI:**
 ```bash
@@ -99,59 +136,184 @@ cd xstage
 pip install -e .
 ```
 
-**RHEL/AlmaLinux:**
+**Dependencies:**
+- Python 3.9+
+- PySide6 (Qt bindings)
+- OpenUSD 25.11+ (usd-core)
+- NumPy
+- Optional: trimesh (for OBJ/STL/PLY conversion)
+- Optional: pygltflib (for glTF conversion)
+
+### Basic Usage
+
 ```bash
-sudo dnf install xstage
+# View USD file
+xstage scene.usd
+
+# Convert FBX to USD with scale correction
+xstage model.fbx --export output.usd --scale 0.01
+
+# Convert with axis correction
+xstage imported.obj --up-axis Z --flip-y
+
+# Combine fixes
+xstage import.obj --scale 0.001 --up-axis Z --flip-z
 ```
 
-[Full installation guide →](docs/installation.md)
+### Python API
 
-## 🎯 Use Cases
-
-**Asset Review:**
-```bash
-# Quick asset check with proper scale
-xstage /mnt/assets/character.fbx --scale 0.01
-```
-
-**Pipeline Integration:**
 ```python
-from xstage import Viewer
+from xstage import USDViewerWindow
 
-viewer = Viewer()
-viewer.load_stage("/path/to/scene.usd")
-viewer.set_scale(0.01)  # Fix import scale
+# Create viewer
+viewer = USDViewerWindow()
+viewer.load_usd_file("scene.usd")
 viewer.show()
 ```
 
-**Batch Conversion:**
-```bash
-# Convert all FBX to USD
-for file in *.fbx; do
-    xstage "$file" --export "${file%.fbx}.usd" --scale 0.01
-done
+### Converter API
+
+```python
+from xstage import USDConverter, ConversionOptions
+
+# Create converter
+options = ConversionOptions(
+    scale=0.01,
+    up_axis='Y',
+    export_materials=True
+)
+converter = USDConverter(options)
+
+# Convert file
+converter.convert("model.fbx", "model.usd")
 ```
+
+---
+
+## 🎯 Use Cases
+
+### Asset Review
+```bash
+# Quick asset check with proper scale
+xstage /pipeline/assets/character.fbx --scale 0.01
+```
+
+### Animation Editing
+- Edit animation curves directly in viewer
+- Visualize and adjust keyframes
+- Export/import animation data
+
+### Material Workflows
+- Edit material properties
+- Assign materials to prims
+- Preview material changes
+- Manage material libraries
+
+### Scene Management
+- Compare scene versions
+- Manage layer composition
+- Edit prim properties
+- Organize with collections
+
+### Pipeline Integration
+```python
+from xstage import PipelineIntegration
+
+pipeline = PipelineIntegration()
+pipeline.load_config("/path/to/pipeline.json")
+asset_path = pipeline.get_asset_path("character_01", "model")
+```
+
+### Batch Processing
+```python
+from xstage import BatchOperationManager
+
+# Batch convert files
+files = ["model1.fbx", "model2.fbx", "model3.fbx"]
+for f in files:
+    converter.convert(f, f.replace('.fbx', '.usd'))
+```
+
+---
 
 ## 📖 Documentation
 
-- [User Guide](https://xstage-pipeline.github.io/docs/user-guide)
-- [Pipeline Integration](https://xstage-pipeline.github.io/docs/pipeline)
-- [Plugin Development](https://xstage-pipeline.github.io/docs/plugins)
-- [API Reference](https://xstage-pipeline.github.io/docs/api)
+- **[User Guide](docs/user-guide.md)** - Complete user documentation
+- **[Pipeline Integration](docs/pipeline.md)** - Pipeline setup and integration
+- **[API Reference](docs/api.md)** - Complete API documentation
+- **[Feature List](ADDED_FEATURES.md)** - All implemented features
+- **[Future Features](FUTURE_FEATURES.md)** - Planned enhancements
+
+---
+
+## 🛠️ Tools Menu
+
+All advanced features are accessible from the **Tools** menu:
+
+- **Layer Composition** - Visualize and manage layer stack
+- **Animation Curve Editor** - Edit animation curves
+- **Material Editor** - Edit material properties
+- **Scene Search & Filter** - Advanced search and filtering
+- **Camera Management** - Manage cameras
+- **Prim Properties** - Edit prim properties
+- **Collection Editor** - Edit collections
+- **Primvar Editor** - Edit primvars
+- **Render Settings Editor** - Configure render settings
+- **Stage Variables** - Manage stage variables
+- **OpenExec** - Computed attributes and extent calculations
+- **Multi-Viewport** - Multiple synchronized viewports
+- **Scene Comparison** - Compare two stages
+- **Batch Operations** - Process multiple prims/files
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+- **Ctrl+O** - Open USD file
+- **Ctrl+I** - Import and convert
+- **F** - Frame all geometry
+- **F1** - Help
+- **Space** - Play/pause animation
+- **Left/Right Arrow** - Previous/Next frame
+
+---
 
 ## 🤝 Community
 
-- [Discord](https://discord.gg/xstage) - Chat with the community
-- [Forum](https://github.com/xstage-pipeline/xstage/discussions) - Q&A
-- [Twitter](https://twitter.com/xstage_pipeline) - Updates
+- **[Discord](https://discord.gg/xstage)** - Chat with the community
+- **[GitHub Discussions](https://github.com/xstage-pipeline/xstage/discussions)** - Q&A and discussions
+- **[Issues](https://github.com/xstage-pipeline/xstage/issues)** - Bug reports and feature requests
+
+---
 
 ## 🙏 Credits
 
 Built with:
-- [OpenUSD](https://openusd.org) by Pixar
-- [Qt/PySide6](https://qt.io)
+- **[OpenUSD](https://openusd.org)** by Pixar - Universal Scene Description
+- **[Qt/PySide6](https://qt.io)** - Cross-platform UI framework
+- **[NumPy](https://numpy.org)** - Numerical computing
 
 **Production-proven at [NOX VFX](https://nox-vfx.com)** 🎬
+
+---
+
+## 📊 Statistics
+
+- **26 Features Implemented** - All high and medium priority features complete
+- **8+ Format Support** - Comprehensive converter system
+- **40+ Modules** - Well-organized, maintainable codebase
+- **Production Ready** - Fully tested and pipeline-integrated
+
+---
+
+## 🎉 Status
+
+**xStage is production-ready!** All critical features have been implemented:
+- ✅ Hydra 2.0 rendering
+- ✅ Complete editing capabilities
+- ✅ Comprehensive converter
+- ✅ Pipeline integration
+- ✅ Professional workflow tools
 
 ---
 
@@ -160,45 +322,3 @@ Built with:
   <br>
   <sub>Apache 2.0 License • Made by the VFX community</sub>
 </div>
-```
-
----
-
-## 🌐 Domain & Social
-
-### Domain
-**Primary:** `xstage.org` or `xstage-pipeline.org`
-
-**Alternatives:**
-- `xstage.io` (tech-focused)
-- `getxstage.com` (marketing)
-- `xstage.dev` (developer-focused)
-
-### Social Handles
-- **GitHub:** `@xstage-pipeline`
-- **Twitter/X:** `@xstage_pipeline`
-- **Discord:** `xStage Pipeline`
-- **YouTube:** `@xstage-pipeline`
-
----
-
-## 🎬 Launch Announcement
-```
-🎬 Introducing xStage - Extended USD Viewer
-
-After years in production at NOX VFX, we're open-sourcing our USD viewer!
-
-✨ What makes xStage different?
-- Scene scale control (fix cm→m imports)
-- Axis orientation (Y-up/Z-up, flips)
-- Measured grid (Houdini-style)
-- Hydra 2.0 powered
-- Pipeline integration
-- 100% open source
-
-Built for pipelines, by pipeline artists.
-
-🔗 github.com/xstage-pipeline/xstage
-📖 xstage.org
-
-#OpenUSD #VFX #Pipeline #OpenSource

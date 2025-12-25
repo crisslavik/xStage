@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from typing import Optional
 
-from .scene_comparison import SceneComparator, SceneDiff
+from ...managers.scene_comparison import SceneComparator, SceneDiff
 
 
 class SceneComparisonWidget(QWidget):
