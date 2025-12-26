@@ -68,6 +68,7 @@ from .converters import (
 from .utils import (
     AnnotationManager,
     BookmarkManager,
+    CacheManager,
     ColorSpaceManager,
     HelpSystem,
     HelpDialog,
@@ -77,8 +78,12 @@ from .utils import (
     ProgressReporter,
     ProgressDialogManager,
     RecentFilesManager,
+    ThemeManager,
+    ThemeColors,
+    ThemeMode,
     UsdLuxExtractor,
     ValidationManager,
+    ViewportOverlay,
 )
 
 # Config
@@ -100,6 +105,7 @@ __all__ = [
     # UI Editors
     "AnimationCurveEditorWidget",
     "AnnotationsWidget",
+    "AOVVisualizationWidget",
     "CameraManagerWidget",
     "CollectionEditorWidget",
     "ConverterDialog",
@@ -112,13 +118,25 @@ __all__ = [
     "SceneComparisonWidget",
     "SceneSearchWidget",
     "StageVariablesWidget",
+    # UI Widgets
+    "MaterialPreviewWidget",
+    "TexturePreviewWidget",
     # Managers
     "AnimationCurveManager",
+    "AOVManager",
+    "AOVInfo",
+    "AOVDisplayMode",
     "BatchOperationManager",
     "CameraManager",
     "CollectionManager",
     "CoordinateSystemManager",
+    "InstancingManager",
+    "InstanceInfo",
+    "InstanceMode",
     "LayerCompositionManager",
+    "LODManager",
+    "LODLevel",
+    "LODMode",
     "MaterialManager",
     "NamespaceEditor",
     "OpenExecManager",
@@ -126,6 +144,9 @@ __all__ = [
     "PrimSelectionManager",
     "SceneComparator",
     "SceneSearchManager",
+    "SelectionSetManager",
+    "SelectionSet",
+    "SelectionSetOperation",
     "StageVariableManager",
     "UndoRedoManager",
     "VariantManager",
@@ -135,6 +156,7 @@ __all__ = [
     # Utils
     "AnnotationManager",
     "BookmarkManager",
+    "CacheManager",
     "ColorSpaceManager",
     "HelpSystem",
     "HelpDialog",
@@ -144,8 +166,12 @@ __all__ = [
     "ProgressReporter",
     "ProgressDialogManager",
     "RecentFilesManager",
+    "ThemeManager",
+    "ThemeColors",
+    "ThemeMode",
     "UsdLuxExtractor",
     "ValidationManager",
+    "ViewportOverlay",
     # Config
     "AppConfig",
     # Multi-viewport

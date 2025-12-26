@@ -16,10 +16,10 @@ from PySide6.QtWidgets import (
     QMenuBar, QMenu, QToolBar, QStatusBar, QFileDialog, QSlider,
     QPushButton, QLabel, QDockWidget, QTreeWidget, QTreeWidgetItem,
     QMessageBox, QProgressDialog, QComboBox, QSpinBox, QGroupBox,
-    QFormLayout, QSplitter
+    QFormLayout, QSplitter, QInputDialog, QTabWidget
 )
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QThread
-from PySide6.QtGui import QAction, QKeySequence, QIcon
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QPalette, QColor
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -648,6 +648,10 @@ class ViewportWidget(QOpenGLWidget):
         
     def paintGL(self):
         """Render the scene"""
+        # Record frame for FPS calculation
+        if hasattr(self, 'overlay') and self.overlay:
+            self.overlay.record_frame()
+        
         # Clear buffers
         bg = self.settings.background_color
         glClearColor(*bg)
@@ -869,18 +873,36 @@ class USDViewerWindow(QMainWindow):
         self.scene_comparison_widget = None
         self.openexec_widget = None
         self.annotations_widget = None
+        self.aov_widget = None
+        self.texture_preview_widget = None
+        self.selection_sets_widget = None
         self.prim_selection_manager = None
         self.undo_redo_manager = None
         self.help_system = None
+        self.viewport_overlay = None
         
         # Initialize managers
         from ..utils.help_system import HelpSystem
         from ..utils.recent_files import RecentFilesManager
         from ..utils.bookmarks import BookmarkManager
+        from ..utils.theme_manager import ThemeManager
+        from ..utils.cache_manager import CacheManager
+        from ..managers.selection_sets import SelectionSetManager
+        from ..managers.lod_manager import LODManager
+        from ..managers.instancing_manager import InstancingManager
         
         self.help_system = HelpSystem()
         self.recent_files_manager = RecentFilesManager()
         self.bookmark_manager = BookmarkManager()
+        self.theme_manager = ThemeManager(self)
+        self.cache_manager = CacheManager()
+        self.selection_set_manager = SelectionSetManager()
+        self.lod_manager = LODManager()
+        self.instancing_manager = InstancingManager()
+        
+        # Apply theme
+        self.theme_manager.theme_changed.connect(self.on_theme_changed)
+        self.on_theme_changed(self.theme_manager.current_theme_name)
         
         self._add_tooltips()
         
@@ -907,6 +929,16 @@ class USDViewerWindow(QMainWindow):
             self.viewport.set_stage_manager(self.stage_manager)
             self.setCentralWidget(self.viewport)
             self.hydra_viewport = None
+        
+        # Add viewport overlay (will be shown after viewport is visible)
+        from ..utils.viewport_overlay import ViewportOverlay
+        self.viewport_overlay = ViewportOverlay(self.viewport)
+        self.viewport_overlay.setParent(self.viewport)
+        self.viewport_overlay.raise_()
+        self.viewport_overlay.show()
+        
+        # Store overlay reference in viewport for resize handling
+        self.viewport.overlay = self.viewport_overlay
         
         # Create menus
         self.create_menus()
@@ -1052,6 +1084,24 @@ class USDViewerWindow(QMainWindow):
         annotations_action = QAction("&Annotations...", self)
         annotations_action.triggered.connect(self.show_annotations)
         tools_menu.addAction(annotations_action)
+        
+        tools_menu.addSeparator()
+        
+        # Visual features
+        aov_action = QAction("&AOV Visualization...", self)
+        aov_action.triggered.connect(self.show_aov_visualization)
+        tools_menu.addAction(aov_action)
+        
+        texture_preview_action = QAction("&Texture/Material Preview...", self)
+        texture_preview_action.triggered.connect(self.show_texture_preview)
+        tools_menu.addAction(texture_preview_action)
+        
+        tools_menu.addSeparator()
+        
+        # Selection sets
+        selection_sets_action = QAction("&Selection Sets...", self)
+        selection_sets_action.triggered.connect(self.show_selection_sets)
+        tools_menu.addAction(selection_sets_action)
         
         tools_menu.addSeparator()
         
@@ -1300,15 +1350,49 @@ class USDViewerWindow(QMainWindow):
                 self.recent_files_manager.add_file(filepath, "usd")
                 self.update_recent_files_menu()
             
-            # Initialize undo/redo
+            # Initialize managers
             if USD_AVAILABLE:
                 from ..managers.undo_redo import UndoRedoManager
                 self.undo_redo_manager = UndoRedoManager()
+                
+                if self.stage_manager.stage:
+                    from ..managers.prim_selection import PrimSelectionManager
+                    self.prim_selection_manager = PrimSelectionManager(self.stage_manager.stage)
+                    
+                            # Initialize LOD and instancing managers
+                    self.lod_manager.stage = self.stage_manager.stage
+                    # Detect LODs for all prims
+                    for prim in self.stage_manager.stage.Traverse():
+                        self.lod_manager.detect_lod_levels(str(prim.GetPath()))
+                    
+                    self.instancing_manager.stage = self.stage_manager.stage
+                    self.instancing_manager.detect_instances()
+                    
+                    # Update selection set manager
+                    self.selection_set_manager.stage = self.stage_manager.stage
             
-            # Initialize prim selection manager
-            if USD_AVAILABLE and self.stage_manager.stage:
-                from ..managers.prim_selection import PrimSelectionManager
-                self.prim_selection_manager = PrimSelectionManager(self.stage_manager.stage)
+            # Update viewport overlay with stats
+            if hasattr(self, 'viewport_overlay') and self.viewport_overlay:
+                stats = {
+                    'meshes': len(geometry_data.get('meshes', [])),
+                    'cameras': len(geometry_data.get('cameras', [])),
+                    'lights': len(geometry_data.get('lights', [])),
+                    'materials': len(geometry_data.get('materials', [])),
+                    'grid_enabled': self.viewport.settings.grid_enabled,
+                    'axis_enabled': self.viewport.settings.axis_enabled,
+                }
+                self.viewport_overlay.set_stats(stats)
+                
+                # Update camera info if available
+                if geometry_data.get('cameras'):
+                    cam = geometry_data['cameras'][0]
+                    self.viewport_overlay.set_camera_info({
+                        'name': cam.get('name', 'Camera'),
+                        'fov': cam.get('focal_length', 50.0)
+                    })
+            
+            # Clear cache for new file
+            self.cache_manager.clear_cache_for_file(filepath)
             
             self.statusBar().showMessage(f"Loaded: {filepath}", 5000)
             self.setWindowTitle(f"USD Viewer - {Path(filepath).name}")
@@ -1958,6 +2042,195 @@ class USDViewerWindow(QMainWindow):
                 # Select prim in hierarchy
                 # Could also frame camera if it's a camera bookmark
                 pass
+    
+    def on_theme_changed(self, theme_name: str):
+        """Handle theme change"""
+        palette = self.palette()
+        self.theme_manager.apply_theme_to_palette(palette)
+        self.setPalette(palette)
+        
+        # Update viewport background color
+        if hasattr(self, 'viewport'):
+            theme_colors = self.theme_manager.get_theme()
+            bg_color = QColor(theme_colors.viewport_bg)
+            self.viewport.settings.background_color = (
+                bg_color.redF(), bg_color.greenF(), bg_color.blueF(), 1.0
+            )
+            self.viewport.update()
+    
+    def toggle_viewport_overlay(self, checked: bool):
+        """Toggle viewport overlay visibility"""
+        if hasattr(self, 'viewport_overlay'):
+            self.viewport_overlay.setVisible(checked)
+    
+    def show_aov_visualization(self):
+        """Show AOV visualization dock"""
+        if not hasattr(self, 'aov_widget') or not self.aov_widget:
+            from ..ui.editors.aov_visualization_ui import AOVVisualizationWidget
+            self.aov_widget = AOVVisualizationWidget()
+            dock = QDockWidget("AOV Visualization", self)
+            dock.setWidget(self.aov_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.aov_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.aov_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_texture_preview(self):
+        """Show texture/material preview dock"""
+        if not hasattr(self, 'texture_preview_widget') or not self.texture_preview_widget:
+            from ..ui.widgets.texture_preview import TexturePreviewWidget
+            from ..ui.widgets.material_preview import MaterialPreviewWidget
+            
+            # Create tab widget with both texture and material preview
+            preview_tabs = QTabWidget()
+            
+            texture_widget = TexturePreviewWidget()
+            preview_tabs.addTab(texture_widget, "Texture")
+            
+            material_widget = MaterialPreviewWidget()
+            preview_tabs.addTab(material_widget, "Material")
+            
+            self.texture_preview_widget = preview_tabs
+            
+            dock = QDockWidget("Texture/Material Preview", self)
+            dock.setWidget(preview_tabs)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.texture_preview_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def show_selection_sets(self):
+        """Show selection sets dock"""
+        if not hasattr(self, 'selection_sets_widget') or not self.selection_sets_widget:
+            from PySide6.QtWidgets import QListWidget
+            
+            # Create selection sets widget
+            widget = QWidget()
+            layout = QVBoxLayout()
+            
+            title = QLabel("<b>Selection Sets</b>")
+            layout.addWidget(title)
+            
+            # Selection sets list
+            self.selection_sets_list = QListWidget()
+            self.selection_sets_list.itemDoubleClicked.connect(self.on_selection_set_double_clicked)
+            layout.addWidget(self.selection_sets_list)
+            
+            # Buttons
+            buttons_layout = QHBoxLayout()
+            
+            save_btn = QPushButton("Save Current Selection...")
+            save_btn.clicked.connect(self.save_current_selection)
+            buttons_layout.addWidget(save_btn)
+            
+            apply_btn = QPushButton("Apply Selected")
+            apply_btn.clicked.connect(self.apply_selection_set)
+            buttons_layout.addWidget(apply_btn)
+            
+            delete_btn = QPushButton("Delete")
+            delete_btn.clicked.connect(self.delete_selection_set)
+            buttons_layout.addWidget(delete_btn)
+            
+            layout.addLayout(buttons_layout)
+            
+            widget.setLayout(layout)
+            
+            self.selection_sets_widget = widget
+            
+            dock = QDockWidget("Selection Sets", self)
+            dock.setWidget(widget)
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+            
+            self.refresh_selection_sets()
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.selection_sets_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def refresh_selection_sets(self):
+        """Refresh selection sets list"""
+        if hasattr(self, 'selection_sets_list') and self.selection_sets_list:
+            self.selection_sets_list.clear()
+            if self.stage_manager and self.stage_manager.stage:
+                stage_path = self.stage_manager.stage.GetRootLayer().identifier
+                selection_sets = self.selection_set_manager.get_selection_sets_for_stage(stage_path)
+                for s in selection_sets:
+                    item_text = f"{s.name} ({len(s.prim_paths)} prims)"
+                    if s.description:
+                        item_text += f" - {s.description}"
+                    self.selection_sets_list.addItem(item_text)
+    
+    def save_current_selection(self):
+        """Save current selection as selection set"""
+        name, ok = QInputDialog.getText(self, "Save Selection Set", "Name:")
+        if ok and name:
+            # Get current selection from hierarchy
+            selected_items = self.hierarchy_tree.selectedItems()
+            prim_paths = []
+            for item in selected_items:
+                prim_path = item.data(0, Qt.ItemDataRole.UserRole)
+                if prim_path:
+                    prim_paths.append(prim_path)
+            
+            if prim_paths:
+                self.selection_set_manager.set_current_selection(prim_paths)
+                self.selection_set_manager.save_current_selection(name)
+                self.refresh_selection_sets()
+            else:
+                QMessageBox.warning(self, "No Selection", "Please select prims in the hierarchy first.")
+    
+    def apply_selection_set(self):
+        """Apply selected selection set"""
+        if not hasattr(self, 'selection_sets_list') or not self.selection_sets_list:
+            return
+        
+        selected = self.selection_sets_list.currentItem()
+        if selected:
+            # Get selection set name from item text
+            item_text = selected.text()
+            name = item_text.split(" (")[0]
+            
+            from ..managers.selection_sets import SelectionSetOperation
+            prim_paths = self.selection_set_manager.apply_selection_set(name, SelectionSetOperation.REPLACE)
+            # Select prims in hierarchy
+            self.hierarchy_tree.clearSelection()
+            for prim_path in prim_paths:
+                items = self.hierarchy_tree.findItems(prim_path, Qt.MatchFlag.MatchContains | Qt.MatchFlag.MatchRecursive, 0)
+                if items:
+                    items[0].setSelected(True)
+                    self.hierarchy_tree.scrollToItem(items[0])
+    
+    def delete_selection_set(self):
+        """Delete selected selection set"""
+        if not hasattr(self, 'selection_sets_list') or not self.selection_sets_list:
+            return
+        
+        selected = self.selection_sets_list.currentItem()
+        if selected:
+            item_text = selected.text()
+            name = item_text.split(" (")[0]
+            
+            reply = QMessageBox.question(
+                self, "Delete Selection Set", f"Delete '{name}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.selection_set_manager.delete_selection_set(name)
+                self.refresh_selection_sets()
+    
+    def on_selection_set_double_clicked(self, item):
+        """Handle double-click on selection set"""
+        self.apply_selection_set()
     
     def show_about(self):
         """Show about dialog"""

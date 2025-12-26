@@ -6,6 +6,7 @@ Editor UI widgets
 try:
     from .animation_curve_ui import AnimationCurveEditorWidget
     from .annotations_ui import AnnotationsWidget
+    from .aov_visualization_ui import AOVVisualizationWidget
     from .camera_manager_ui import CameraManagerWidget
     from .collection_editor_ui import CollectionEditorWidget
     from .converter_ui import ConverterDialog
@@ -22,6 +23,7 @@ try:
     __all__ = [
         "AnimationCurveEditorWidget",
         "AnnotationsWidget",
+        "AOVVisualizationWidget",
         "CameraManagerWidget",
         "CollectionEditorWidget",
         "ConverterDialog",

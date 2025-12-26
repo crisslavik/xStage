@@ -167,6 +167,13 @@ class ViewportWidget(QOpenGLWidget):
     def resizeGL(self, w, h):
         """Handle viewport resize"""
         glViewport(0, 0, w, h)
+    
+    def resizeEvent(self, event):
+        """Handle widget resize"""
+        super().resizeEvent(event)
+        # Emit signal for overlay update if available
+        if hasattr(self, 'overlay'):
+            self.overlay.resize(self.size())
         
     def paintGL(self):
         """Render the scene"""

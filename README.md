@@ -52,6 +52,13 @@ xstage imported.obj --up-axis Z --flip-y
 | **Scene Comparison** | ✅ | ❌ | ✅ |
 | **Pipeline Integration** | ✅ | ❌ | ✅ |
 | **OpenExec Support** | ✅ | ❌ | ⚠️ |
+| **Theme System** | ✅ | ❌ | ✅ |
+| **Viewport Overlays** | ✅ | ❌ | ✅ |
+| **Selection Sets** | ✅ | ❌ | ✅ |
+| **Smart Caching** | ✅ | ❌ | ⚠️ |
+| **LOD System** | ✅ | ❌ | ⚠️ |
+| **AOV Visualization** | ✅ | ❌ | ✅ |
+| **Texture/Material Preview** | ✅ | ❌ | ✅ |
 
 ---
 
@@ -81,6 +88,8 @@ xstage imported.obj --up-axis Z --flip-y
 - **Multi-Viewport** - Professional multi-view workflow (perspective, top, front, side)
 - **Camera Management** - Switch between cameras, edit properties, create new cameras
 - **Bookmarks** - Quick access to frequently used prims and locations
+- **Recent Files** - Quick access to recently opened files
+- **Selection Sets** - Save and manage named selection groups
 
 ### 🔄 Conversion & Import
 - **Comprehensive Converter** - Convert 8+ formats to USD:
@@ -106,6 +115,11 @@ xstage imported.obj --up-axis Z --flip-y
 - **Coordinate Systems** - Support for coordinate system bindings
 - **Variant Sets** - View and switch variant selections
 - **USD Validation** - Built-in USD compliance checking
+- **Smart Caching** - Geometry, bounds, and transform caching for performance
+- **LOD System** - Automatic Level of Detail management
+- **Instancing Optimization** - Instance detection and memory optimization
+- **AOV Visualization** - Render Var extraction and preview
+- **Texture/Material Preview** - Preview textures and materials on 3D geometry
 
 ### 🔗 Pipeline Integration
 - **Pipeline Configuration** - Easy integration with VFX pipelines
@@ -117,6 +131,11 @@ xstage imported.obj --up-axis Z --flip-y
 - **Help System** - In-app help with context-sensitive tooltips
 - **Tooltips** - Comprehensive tooltips for all UI elements
 - **Documentation** - Complete user documentation
+
+### 🎨 UI & Polish
+- **Theme System** - Dark, Light, and High Contrast themes
+- **Viewport Overlays** - FPS counter, statistics, memory usage, selection info
+- **Customizable UI** - Professional, polished interface
 
 ---
 
@@ -266,6 +285,9 @@ All advanced features are accessible from the **Tools** menu:
 - **Multi-Viewport** - Multiple synchronized viewports
 - **Scene Comparison** - Compare two stages
 - **Batch Operations** - Process multiple prims/files
+- **AOV Visualization** - Render Var extraction and preview
+- **Texture/Material Preview** - Preview textures and materials
+- **Selection Sets** - Save and manage named selection groups
 
 ---
 
@@ -277,6 +299,13 @@ All advanced features are accessible from the **Tools** menu:
 - **F1** - Help
 - **Space** - Play/pause animation
 - **Left/Right Arrow** - Previous/Next frame
+
+## 🎨 View Menu
+
+- **Theme** - Switch between Dark, Light, and High Contrast themes
+- **Show Viewport Overlay** - Toggle FPS, stats, and memory display
+- **Recent Files** - Quick access to recently opened files
+- **Bookmarks** - Access saved bookmarks
 
 ---
 
@@ -301,10 +330,11 @@ Built with:
 
 ## 📊 Statistics
 
-- **26 Features Implemented** - All high and medium priority features complete
+- **34+ Features Implemented** - All high and medium priority features complete, plus Phase 1-3 enhancements
 - **8+ Format Support** - Comprehensive converter system
-- **40+ Modules** - Well-organized, maintainable codebase
+- **50+ Modules** - Well-organized, maintainable codebase
 - **Production Ready** - Fully tested and pipeline-integrated
+- **Phase 1-3 Complete** - Polish, Performance, and Visual Features implemented
 
 ---
 
