@@ -31,6 +31,14 @@ This document outlines strategic improvements to make xStage the industry-leadin
 | **AOV Visualization** | ✅ | ❌ | ✅ |
 | **Texture/Material Preview** | ✅ | ❌ | ✅ |
 
+### Market Positioning
+
+**xStage** fills the gap between basic open-source tools (usdview) and expensive commercial solutions:
+
+- **vs. usdview**: xStage adds production-ready features (converter, pipeline integration, advanced editing)
+- **vs. Commercial Tools**: xStage provides similar features at zero cost, with open-source benefits
+- **Unique Value**: Only open-source USD viewer with comprehensive format conversion and pipeline integration
+
 ---
 
 ## 🚀 High-Impact Improvements

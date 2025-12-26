@@ -1,6 +1,6 @@
 """
 Material Validator
-Validates materials for Houdini Karma and Nuke 17 compatibility
+Validates materials for Houdini Karma, Nuke 17, and Blender compatibility
 """
 
 from typing import List, Dict, Optional
@@ -30,7 +30,7 @@ class MaterialValidator:
         Initialize validator
         
         Args:
-            target: Target application ("karma", "nuke", "auto")
+            target: Target application ("karma", "nuke", "blender", "auto")
         """
         self.target = target
     
@@ -76,7 +76,7 @@ class MaterialValidator:
                     issues.extend(shader_issues)
             
             # Check for MaterialX compatibility
-            if self.target in ["karma", "nuke", "auto"]:
+            if self.target in ["karma", "nuke", "blender", "auto"]:
                 mtlx_issues = self._validate_materialx_compatibility(material)
                 issues.extend(mtlx_issues)
         
@@ -98,14 +98,14 @@ class MaterialValidator:
             shader_id = shader.GetIdAttr().Get()
             
             # Check for MaterialX shader IDs
-            if self.target in ["karma", "nuke", "auto"]:
+            if self.target in ["karma", "nuke", "blender", "auto"]:
                 if shader_id and "standard_surface" in shader_id:
                     # Valid MaterialX Standard Surface
                     pass
                 elif shader_id and "UsdPreviewSurface" in shader_id:
                     issues.append(MaterialIssue(
                         severity="warning",
-                        message="Using UsdPreviewSurface instead of MaterialX (may not render correctly in Karma/Nuke)",
+                        message="Using UsdPreviewSurface instead of MaterialX (may not render correctly in Karma/Nuke/Blender)",
                         prim_path=str(shader_prim.GetPath()),
                         property_name="id"
                     ))
@@ -132,7 +132,7 @@ class MaterialValidator:
         return issues
     
     def _validate_materialx_compatibility(self, material: UsdShade.Material) -> List[MaterialIssue]:
-        """Validate MaterialX compatibility for Karma/Nuke"""
+        """Validate MaterialX compatibility for Karma/Nuke/Blender"""
         issues = []
         
         try:
@@ -143,7 +143,7 @@ class MaterialValidator:
                 # Not a MaterialX material, but that's okay if using standard shaders
                 pass
             
-            # Check for Houdini/Nuke specific metadata
+            # Check for application-specific metadata
             if self.target == "karma":
                 if not prim.HasMetadata("houdini:material"):
                     issues.append(MaterialIssue(
@@ -157,6 +157,14 @@ class MaterialValidator:
                     issues.append(MaterialIssue(
                         severity="info",
                         message="Material missing Nuke metadata (optional)",
+                        prim_path=str(prim.GetPath())
+                    ))
+            
+            elif self.target == "blender":
+                if not prim.HasMetadata("blender:material"):
+                    issues.append(MaterialIssue(
+                        severity="info",
+                        message="Material missing Blender metadata (optional, future-proof)",
                         prim_path=str(prim.GetPath())
                     ))
         

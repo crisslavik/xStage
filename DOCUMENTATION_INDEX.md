@@ -44,17 +44,11 @@ Complete guide to all xStage documentation files.
 
 ### **STRATEGIC_IMPROVEMENTS.md**
 **Strategic planning** - Long-term improvements
-- Competitive analysis
+- Competitive analysis (xStage vs. usdview vs. commercial tools)
+- Market positioning and opportunities
 - High-impact improvements
 - Implementation roadmap
 - Unique value propositions
-
-### **COMPETITIVE_ANALYSIS.md**
-**Market positioning** - Competitive comparison
-- xStage vs. usdview
-- xStage vs. commercial tools
-- Market gaps and opportunities
-- Strategic advantages
 
 ---
 
@@ -84,23 +78,26 @@ Material creation best practices
 - Production workflows
 
 ### **docs/HOUDINI_NUKE_COMPATIBILITY.md**
-Houdini Karma & Nuke 17 compatibility
+Houdini Karma, Nuke 17 & Blender compatibility
 - Karma material support
 - Nuke 17 MaterialX integration
+- Blender MaterialX support (beta/future-proof)
 - Material validation
 - Troubleshooting
 
-### **docs/xmaterial-support.md**
-XMaterial/MaterialX shader support
-- XMaterial shader details
+### **docs/materialx-support.md**
+MaterialX shader support
+- MaterialX Standard Surface shader details
 - MaterialX integration
 - Usage examples
 - Requirements
+- Official MaterialX resources: https://materialx.org/
 
-### **docs/adobe-plugin-formats.md**
-Adobe USD Fileformat Plugins
-- Supported formats (FBX, OBJ, glTF, etc.)
-- Plugin installation
+### **docs/adobe-auto-install.md**
+Adobe USD Fileformat Plugins (Auto-Installer & Formats)
+- Auto-installer functionality
+- Supported formats (FBX, OBJ, glTF, STL, PLY, Substance)
+- Installation methods
 - Format-specific features
 
 ### **docs/alembic-improvements.md**
@@ -122,11 +119,6 @@ Rotation and axis handling
 - Axis orientation
 - Rotation workflows
 
-### **docs/strategy.md**
-Strategic planning document
-- Long-term vision
-- Feature priorities
-- Development roadmap
 
 ---
 
@@ -148,13 +140,13 @@ Code of conduct
 
 ## 📊 **Documentation Statistics**
 
-- **Total Documentation Files**: 20
+- **Total Documentation Files**: 17 (consolidated from 20+)
 - **Main Documentation**: 4 files
-- **Strategic Docs**: 2 files
+- **Strategic Docs**: 1 file
 - **Technical Docs**: 2 files
-- **Feature-Specific Docs**: 7 files
+- **Feature-Specific Docs**: 6 files (in docs/)
 - **Community Docs**: 2 files
-- **Other**: 3 files
+- **Planning Docs**: 2 files (NEXT_STEPS.md, OPTIONAL_PLUGINS.md)
 
 ---
 
@@ -164,8 +156,8 @@ Code of conduct
 **What's Implemented**: ADDED_FEATURES.md  
 **What's Planned**: FUTURE_FEATURES.md  
 **Material Support**: docs/BEST_MATERIAL_PRACTICES.md  
-**Houdini/Nuke**: docs/HOUDINI_NUKE_COMPATIBILITY.md  
-**Converter**: docs/adobe-plugin-formats.md  
+**Houdini/Nuke/Blender**: docs/HOUDINI_NUKE_COMPATIBILITY.md  
+**Converter**: docs/adobe-auto-install.md  
 **Contributing**: CONTRIBUTING.md  
 
 ---
