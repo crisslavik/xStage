@@ -52,3 +52,16 @@ target-version = ['py39']
 
 [tool.pylint]
 max-line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+timeout = 300
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "gui: marks tests that require GUI (deselect with '-m \"not gui\"')",
+    "integration: marks tests as integration tests",
+]
