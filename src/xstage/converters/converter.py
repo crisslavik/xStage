@@ -26,6 +26,8 @@ class ConversionOptions:
     flip_y: bool = False
     flip_z: bool = False
     export_materials: bool = True
+    material_shader_type: str = "auto"  # "auto" (recommended), "XMaterial", "Karma", "Nuke", "MaterialX", "UsdPreviewSurface", "glTF_PBR"
+    validate_materials: bool = True  # Validate materials for target application compatibility
     export_normals: bool = True
     export_uvs: bool = True
     export_colors: bool = True
@@ -55,6 +57,25 @@ class USDConverter:
             '.3ds': self.convert_3ds,
             '.blend': self.convert_blender,
         }
+        
+        # Initialize material creator with smart defaults
+        from .material_creator import MaterialCreator, MaterialShaderType
+        # Use "auto" if not specified, or use provided type
+        shader_type = self.options.material_shader_type or "auto"
+        self.material_creator = MaterialCreator(shader_type=shader_type)
+        
+        # Initialize material validator if validation enabled
+        if self.options.validate_materials:
+            from .material_validator import MaterialValidator
+            # Determine target from shader type
+            if shader_type in ["Karma", "karma"]:
+                self.material_validator = MaterialValidator(target="karma")
+            elif shader_type in ["Nuke", "nuke"]:
+                self.material_validator = MaterialValidator(target="nuke")
+            else:
+                self.material_validator = MaterialValidator(target="auto")
+        else:
+            self.material_validator = None
     
     def convert(self, input_path: str, output_path: str, 
                 progress_callback: Optional[Callable] = None) -> bool:
