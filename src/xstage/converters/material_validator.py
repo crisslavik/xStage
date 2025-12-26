@@ -164,7 +164,7 @@ class MaterialValidator:
                 if not prim.HasMetadata("blender:material"):
                     issues.append(MaterialIssue(
                         severity="info",
-                        message="Material missing Blender metadata (optional, future-proof)",
+                        message="Material missing Blender metadata (optional)",
                         prim_path=str(prim.GetPath())
                     ))
         

@@ -80,8 +80,8 @@ Material creation best practices
 ### **docs/HOUDINI_NUKE_COMPATIBILITY.md**
 Houdini Karma, Nuke 17 & Blender compatibility
 - Karma material support
-- Nuke 17 MaterialX integration
-- Blender MaterialX support (beta/future-proof)
+- Nuke 17 MaterialX integration (beta)
+- Blender MaterialX support (stable)
 - Material validation
 - Troubleshooting
 

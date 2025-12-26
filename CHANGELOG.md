@@ -33,7 +33,8 @@ All notable changes to xStage will be documented in this file.
 - **Texture/Material Preview**: Preview textures and materials on 3D geometry
 
 ### Added - Material Support
-- **Blender MaterialX Support**: Added Blender shader type for future-proof material compatibility (beta)
+- **Blender MaterialX Support**: Added Blender shader type for MaterialX Standard Surface compatibility (stable)
+- **Nuke 17 MaterialX Support**: Added Nuke 17 shader type for MaterialX Standard Surface compatibility (beta)
 
 ### Changed
 - Updated viewer to integrate all new features
