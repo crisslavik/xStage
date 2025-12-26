@@ -38,6 +38,22 @@ try:
         "ValidationManager",
         "ViewportOverlay",
     ]
+    
+    # Adobe plugin installer (optional)
+    try:
+        from .adobe_plugin_installer import (
+            AdobePluginInstaller,
+            auto_install_adobe_plugins,
+            ensure_adobe_plugins_available,
+        )
+        __all__.extend([
+            "AdobePluginInstaller",
+            "auto_install_adobe_plugins",
+            "ensure_adobe_plugins_available",
+        ])
+    except ImportError:
+        pass
+    
 except ImportError as e:
     __all__ = []
     print(f"Warning: Some utilities could not be imported: {e}")

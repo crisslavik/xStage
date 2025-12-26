@@ -33,11 +33,28 @@ class AdobeUSDConverter(BaseConverter):
     """
     Enhanced USD converter using Adobe's USD fileformat plugins
     Provides native FBX support without external dependencies
+    Automatically installs plugins to xStage directory if not available
     """
     
-    def __init__(self, options: ConversionOptions):
+    def __init__(self, options: ConversionOptions, auto_install=True):
         super().__init__(options)
+        self.auto_install = auto_install
         self.adobe_plugins_available = self.check_adobe_plugins()
+        
+        # Auto-install if not available and auto_install is enabled
+        if not self.adobe_plugins_available and self.auto_install:
+            self._try_auto_install()
+    
+    def _try_auto_install(self):
+        """Try to automatically install Adobe plugins"""
+        try:
+            from ..utils.adobe_plugin_installer import ensure_adobe_plugins_available
+            if ensure_adobe_plugins_available():
+                # Recheck after installation
+                self.adobe_plugins_available = self.check_adobe_plugins()
+        except Exception as e:
+            print(f"Auto-installation failed: {e}")
+            print("You can manually install Adobe plugins or disable auto-install.")
         
     def check_adobe_plugins(self) -> bool:
         """Check if Adobe USD fileformat plugins are available"""
@@ -45,14 +62,28 @@ class AdobeUSDConverter(BaseConverter):
             return False
             
         try:
+            # Setup xStage plugin path first
+            try:
+                from ..utils.adobe_plugin_installer import AdobePluginInstaller
+                installer = AdobePluginInstaller()
+                installer.setup_plugin_path()
+            except:
+                pass
+            
             # Check if FBX plugin is registered
             from pxr import Plug
             
             plugin_registry = Plug.Registry()
             fbx_plugin = plugin_registry.GetPluginWithName('usdFbx')
             
-            if fbx_plugin and fbx_plugin.isLoaded:
-                return True
+            if fbx_plugin:
+                if not fbx_plugin.isLoaded:
+                    try:
+                        fbx_plugin.Load()
+                    except:
+                        pass
+                if fbx_plugin.isLoaded:
+                    return True
                 
             # Try to find plugins in standard locations
             plugin_paths = [
@@ -62,11 +93,25 @@ class AdobeUSDConverter(BaseConverter):
                 os.path.expanduser('~/.usd/plugins'),
             ]
             
+            # Also check xStage plugin directory
+            try:
+                from ..utils.adobe_plugin_installer import AdobePluginInstaller
+                installer = AdobePluginInstaller()
+                xstage_plugin_path = installer.get_xstage_plugin_path()
+                plugin_paths.insert(0, str(xstage_plugin_path))
+            except:
+                pass
+            
             for path in plugin_paths:
                 if Path(path).exists():
                     pluginfo_path = Path(path) / 'plugInfo.json'
                     if pluginfo_path.exists():
                         return True
+                    # Check for plugin subdirectories
+                    for plugin_name in ['usdFbx', 'usdObj', 'usdGltf']:
+                        plugin_dir = Path(path) / plugin_name
+                        if plugin_dir.exists() and (plugin_dir / 'plugInfo.json').exists():
+                            return True
                         
         except Exception as e:
             print(f"Error checking Adobe plugins: {e}")

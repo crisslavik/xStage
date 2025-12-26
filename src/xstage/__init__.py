@@ -86,6 +86,21 @@ from .utils import (
     ViewportOverlay,
 )
 
+# Adobe Plugin Installer (optional)
+try:
+    from .utils.adobe_plugin_installer import (
+        AdobePluginInstaller,
+        auto_install_adobe_plugins,
+        ensure_adobe_plugins_available,
+    )
+    __all__.extend([
+        "AdobePluginInstaller",
+        "auto_install_adobe_plugins",
+        "ensure_adobe_plugins_available",
+    ])
+except ImportError:
+    pass
+
 # Config
 from .config import AppConfig
 

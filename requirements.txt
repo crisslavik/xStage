@@ -1,4 +1,4 @@
-# USD Viewer Requirements for RHEL9/AlmaLinux
+# USD Viewer Requirements for Linux (Ubuntu, RHEL9, RHEL10, AlmaLinux)
 
 # Core USD support
 usd-core>=23.11
@@ -14,15 +14,43 @@ PyOpenGL-accelerate>=3.1.7
 # Numerical computing
 numpy>=1.24.0
 
-# Optional format support
+# Image processing (for texture preview)
+Pillow>=10.0.0  # For texture/material preview widget
+
+# System monitoring (for viewport overlay)
+psutil>=5.9.0  # For memory/system stats in viewport HUD
+
+# Format conversion support
 pygltflib>=1.16.0  # For glTF/GLB import
 trimesh>=3.15.0  # For OBJ, STL, PLY, and other mesh format conversion
 
-# Note: All USD features (UsdLux, UsdShade, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils)
-# are included in usd-core package. No additional dependencies required for the new features.
+# Alembic support (optional, fallback for Python Alembic library)
+# Note: USD's native Alembic plugin (usdAbc) is preferred and usually included with USD
+# This is only needed as a fallback if USD Alembic plugin is not available
+alembic>=1.8.0; python_version >= "3.9"  # Python Alembic library (optional fallback)
+
+# Note: All USD features (UsdLux, UsdShade, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils, UsdMtlx)
+# are included in usd-core package. No additional dependencies required for USD features.
+
+# MaterialX/XMaterial Support:
+# - MaterialX (UsdMtlx) is included in usd-core package
+# - XMaterial shader support is built-in when MaterialX is available
+# - No additional Python packages needed for MaterialX/XMaterial
+# - Check availability: python -c "from pxr import UsdMtlx; print('MaterialX available')"
 
 # Converter dependencies (optional, for format support):
-# - FBX: Requires USD FBX plugin or fbx2usd CLI tool
-# - Alembic: Requires USD Alembic plugin (usually included with USD)
+# - FBX: Requires USD FBX plugin (usdFbx) or Adobe USD Fileformat Plugins
+#   * Adobe plugins are C++ plugins (not Python packages) - must be installed separately
+#   * See: https://github.com/adobe/USD-Fileformat-plugins
+#   * Installation: Build from source or install pre-built binaries
+#   * xStage automatically detects and uses Adobe plugins if installed
+# - Alembic: Requires USD Alembic plugin (usdAbc, usually included with USD) or Python Alembic library
 # - glTF: Requires pygltflib (listed above)
 # - OBJ/STL/PLY: Requires trimesh (listed above)
+
+# Optional C++ Plugins (not Python packages - install separately):
+# - Adobe USD Fileformat Plugins: https://github.com/adobe/USD-Fileformat-plugins
+#   * Provides native FBX, OBJ, glTF, STL, PLY, Substance (SBSAR) support
+#   * Must be compiled and installed separately (not in requirements.txt)
+#   * xStage automatically detects and uses these plugins if available
+#   * Installation instructions: See docs/adobe-plugin-formats.md

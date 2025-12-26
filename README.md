@@ -141,6 +141,15 @@ xstage imported.obj --up-axis Z --flip-y
 
 ## 🚀 Quick Start
 
+### Platform Support
+xStage is fully supported on:
+- ✅ **Ubuntu** 20.04 LTS, 22.04 LTS, 24.04 LTS
+- ✅ **RHEL 9** (Red Hat Enterprise Linux 9)
+- ✅ **RHEL 10** (Red Hat Enterprise Linux 10)
+- ✅ **AlmaLinux** 9/10, **Rocky Linux** 9/10
+
+See [Platform Support Guide](docs/platform-support.md) for detailed installation instructions.
+
 ### Installation
 
 **PyPI:**
