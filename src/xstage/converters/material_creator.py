@@ -31,8 +31,8 @@ class MaterialShaderType:
     XMATERIAL = "XMaterial"  # Alias for MaterialX Standard Surface (for backward compatibility)
     GLTF_PBR = "glTF_PBR"  # glTF PBR shader
     KARMA = "Karma"  # Houdini Karma-optimized MaterialX
-    NUKE = "Nuke"  # Nuke 17 MaterialX Standard Surface
-    BLENDER = "Blender"  # Blender MaterialX Standard Surface (beta/future-proof)
+    NUKE = "Nuke"  # Nuke 17 MaterialX Standard Surface (beta)
+    BLENDER = "Blender"  # Blender MaterialX Standard Surface (stable)
 
 
 class MaterialCreator:
@@ -48,8 +48,8 @@ class MaterialCreator:
                 - "MaterialX": MaterialX Standard Surface shader (best for production)
                 - "XMaterial": Alias for MaterialX (for backward compatibility)
                 - "Karma": Houdini Karma-optimized MaterialX
-                - "Nuke": Nuke 17 MaterialX Standard Surface
-                - "Blender": Blender MaterialX Standard Surface (beta/future-proof)
+                - "Nuke": Nuke 17 MaterialX Standard Surface (beta)
+                - "Blender": Blender MaterialX Standard Surface (stable)
                 - "MaterialX": Standard MaterialX shader
                 - "UsdPreviewSurface": Standard USD shader (universal compatibility)
                 - "glTF_PBR": glTF PBR shader
@@ -177,11 +177,11 @@ class MaterialCreator:
                 shader_id = "ND_standard_surface_surfaceshader"
                 shader_name = "KarmaSurface"
             elif self.shader_type == MaterialShaderType.NUKE:
-                # Nuke 17 uses MaterialX Standard Surface
+                # Nuke 17 uses MaterialX Standard Surface (beta)
                 shader_id = "ND_standard_surface_surfaceshader"
                 shader_name = "NukeSurface"
             elif self.shader_type == MaterialShaderType.BLENDER:
-                # Blender uses MaterialX Standard Surface (beta/future-proof)
+                # Blender uses MaterialX Standard Surface (stable)
                 shader_id = "ND_standard_surface_surfaceshader"
                 shader_name = "BlenderSurface"
             elif self.shader_type == MaterialShaderType.XMATERIAL:

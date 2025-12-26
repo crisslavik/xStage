@@ -17,8 +17,8 @@ MaterialX shader support is **already included** in the `usd-core` package. No a
 - `UsdMtlx` module (MaterialX support)
 - MaterialX Standard Surface shader support (`ND_standard_surface_surfaceshader`)
 - Houdini Karma compatibility
-- Nuke 17 MaterialX Standard Surface compatibility
-- Blender MaterialX compatibility (beta/future-proof)
+- Nuke 17 MaterialX Standard Surface compatibility (beta)
+- Blender MaterialX compatibility (stable)
 
 ### **Verification:**
 ```bash

@@ -125,7 +125,7 @@ xstage imported.obj --up-axis Z --flip-y
 - **Pipeline Configuration** - Easy integration with VFX pipelines
 - **Asset Path Management** - Standard asset path resolution
 - **Shot Stage Creation** - Create standard shot structures
-- **Nuke/Houdini/Blender Export** - Optimized export for pipeline tools (Blender beta/future-proof)
+- **Nuke/Houdini/Blender Export** - Optimized export for pipeline tools (Nuke 17 beta, Blender stable)
 
 ### 📚 Help & Documentation
 - **Help System** - In-app help with context-sensitive tooltips

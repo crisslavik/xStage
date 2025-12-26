@@ -24,10 +24,10 @@ MaterialX Standard Surface shader. This is the recommended shader type for produ
 Houdini Karma-optimized MaterialX Standard Surface.
 
 ### 4. **Nuke**
-Nuke 17 MaterialX Standard Surface.
+Nuke 17 MaterialX Standard Surface (beta).
 
 ### 5. **Blender**
-Blender MaterialX Standard Surface (beta/future-proof).
+Blender MaterialX Standard Surface (stable).
 
 ### 6. **glTF_PBR**
 glTF PBR material shader (uses UsdPreviewSurface with glTF conventions).
