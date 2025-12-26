@@ -1,7 +1,7 @@
-# Houdini Karma & Nuke 17 Material Compatibility
+# Houdini Karma, Nuke 17 & Blender Material Compatibility
 ## Enhanced Material Support for Production Pipelines
 
-xStage now includes enhanced material support specifically optimized for **Houdini Karma** and **Nuke 17** compatibility.
+xStage now includes enhanced material support specifically optimized for **Houdini Karma**, **Nuke 17**, and **Blender** (beta/future-proof) compatibility.
 
 ---
 
@@ -69,6 +69,54 @@ material_data = {
     }
 }
 ```
+
+---
+
+## 🎨 **Blender Support** (Beta/Future-Proof)
+
+### **Blender MaterialX Integration**
+
+Blender has been adding USD and MaterialX support (currently in beta/development). xStage creates materials that will be compatible with Blender's MaterialX implementation as it matures.
+
+### **Usage**
+
+```python
+from xstage import USDConverter, ConversionOptions
+
+# Create converter optimized for Blender
+options = ConversionOptions(
+    material_shader_type="Blender",  # Blender-optimized MaterialX
+    export_materials=True,
+    validate_materials=True  # Validate for Blender compatibility
+)
+
+converter = USDConverter(options)
+converter.convert("model.fbx", "model.usd")
+```
+
+### **Features**
+
+- ✅ MaterialX Standard Surface shader (`ND_standard_surface_surfaceshader`)
+- ✅ Full PBR material support (baseColor, metallic, roughness, specular)
+- ✅ Texture support with proper UV mapping
+- ✅ Normal maps with MaterialX normalmap node
+- ✅ Subsurface scattering support
+- ✅ Emission support
+- ✅ Displacement support
+- ✅ Blender metadata for better integration (future-proof)
+
+### **Blender-Specific Features**
+
+- Materials compatible with Blender's USD import/export
+- MaterialX Standard Surface for future Blender MaterialX support
+- Blender metadata tags for identification
+- Ready for Blender's MaterialX implementation when available
+
+### **Status**
+
+**Current**: Blender USD support is available, MaterialX support is in development  
+**Future**: Full MaterialX Standard Surface support expected in future Blender releases  
+**xStage**: Materials are created with Blender-compatible structure and metadata
 
 ---
 
@@ -173,6 +221,10 @@ issues = validator.validate_material(material)
 validator = MaterialValidator(target="nuke")
 issues = validator.validate_material(material)
 
+# Validate for Blender
+validator = MaterialValidator(target="blender")
+issues = validator.validate_material(material)
+
 # Auto-detect target
 validator = MaterialValidator(target="auto")
 issues = validator.validate_material(material)
@@ -185,7 +237,7 @@ issues = validator.validate_material(material)
 - ✅ Required material properties
 - ✅ Texture path validity
 - ✅ MaterialX node graph structure
-- ✅ Houdini/Nuke metadata
+- ✅ Houdini/Nuke/Blender metadata
 
 ---
 
@@ -227,16 +279,19 @@ issues = validator.validate_material(material)
 
 ## 📊 **Comparison**
 
-| Feature | Houdini Karma | Nuke 17 | xStage Support |
-|---------|---------------|---------|----------------|
-| MaterialX Standard Surface | ✅ | ✅ | ✅ |
-| PBR Materials | ✅ | ✅ | ✅ |
-| Texture Support | ✅ | ✅ | ✅ |
-| Normal Maps | ✅ | ✅ | ✅ |
-| Subsurface Scattering | ✅ | ✅ | ✅ |
-| Displacement | ✅ | ⚠️ | ✅ |
-| Emission | ✅ | ✅ | ✅ |
-| Hydra Preview | ✅ | ✅ | ✅ |
+| Feature | Houdini Karma | Nuke 17 | Blender | xStage Support |
+|---------|---------------|---------|---------|----------------|
+| MaterialX Standard Surface | ✅ | ✅ | 🔄 Beta | ✅ |
+| PBR Materials | ✅ | ✅ | ✅ | ✅ |
+| Texture Support | ✅ | ✅ | ✅ | ✅ |
+| Normal Maps | ✅ | ✅ | ✅ | ✅ |
+| Subsurface Scattering | ✅ | ✅ | ✅ | ✅ |
+| Displacement | ✅ | ⚠️ | 🔄 Beta | ✅ |
+| Emission | ✅ | ✅ | ✅ | ✅ |
+| Hydra Preview | ✅ | ✅ | 🔄 Beta | ✅ |
+| USD Import/Export | ✅ | ✅ | ✅ | ✅ |
+
+**Legend**: ✅ Full Support | ⚠️ Limited | 🔄 Beta/In Development
 
 ---
 
@@ -280,6 +335,24 @@ converter.convert("scene.fbx", "scene_nuke.usd")
 # Render with ScanlineRender2
 ```
 
+### **Convert for Blender**
+
+```python
+# Convert with Blender-optimized materials (future-proof)
+options = ConversionOptions(
+    material_shader_type="Blender",
+    export_materials=True,
+    validate_materials=True
+)
+
+converter = USDConverter(options)
+converter.convert("model.fbx", "model_blender.usd")
+
+# Import in Blender (current USD support)
+# Materials ready for MaterialX when available
+# Future-proof structure for Blender MaterialX implementation
+```
+
 ---
 
 ## 🔍 **Troubleshooting**
@@ -297,6 +370,13 @@ converter.convert("scene.fbx", "scene_nuke.usd")
 2. Check MaterialX plugin is available
 3. Use Hydra viewer for preview
 4. Verify material validation passes
+
+### **Materials not working in Blender**
+
+1. Verify Blender version supports USD (3.0+)
+2. Check MaterialX support status (currently beta/development)
+3. Materials use standard MaterialX structure (future-proof)
+4. USD import should work, MaterialX rendering depends on Blender version
 
 ### **Texture not loading**
 
@@ -321,11 +401,12 @@ xStage now provides:
 
 - ✅ **Houdini Karma** optimized materials
 - ✅ **Nuke 17** compatible materials
+- ✅ **Blender** compatible materials (beta/future-proof)
 - ✅ Enhanced material extraction from all formats
 - ✅ Material validation for compatibility
 - ✅ Full MaterialX Standard Surface support
 - ✅ Advanced material properties (subsurface, displacement, emission)
 - ✅ Production-ready material workflows
 
-Your materials will work seamlessly in both Houdini Karma and Nuke 17! 🎬
+Your materials will work seamlessly in Houdini Karma, Nuke 17, and Blender! 🎬
 

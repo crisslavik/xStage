@@ -275,6 +275,42 @@ rm -rf ~/.xstage/plugins/adobe-usd-plugins
 
 ---
 
+## 📋 **Format Details**
+
+### **FBX (usdFbx)**
+- Native FBX reading and writing
+- Material and texture support
+- Animation support
+- Hierarchy preservation
+
+### **OBJ (usdObj)**
+- Enhanced OBJ with material support
+- MTL file handling
+- Texture coordinate support
+
+### **glTF/GLB (usdGltf)**
+- Enhanced glTF with PBR materials
+- Binary GLB support
+- Animation support
+- Node hierarchy
+
+### **STL (usdStl)**
+- Native STL support
+- Binary and ASCII formats
+- Mesh conversion
+
+### **PLY**
+- Native PLY support
+- Point cloud support
+- Mesh conversion
+
+### **Substance (SBSAR)**
+- Adobe's proprietary material format
+- Material graph support
+- Texture generation
+
+---
+
 ## 📚 **Related Documentation**
 
 - **Adobe Plugins**: `docs/adobe-plugin-formats.md`

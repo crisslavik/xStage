@@ -1,22 +1,24 @@
 # Optional Plugins & Extensions
-## Adobe USD Fileformat Plugins & MaterialX/XMaterial Support
+## Adobe USD Fileformat Plugins & MaterialX Support
 
 This document explains optional components that enhance xStage functionality but are not Python packages.
 
 ---
 
-## 🎨 **MaterialX/XMaterial Support**
+## 🎨 **MaterialX Support**
 
 ### **Status**: ✅ **Included in usd-core**
 
-MaterialX and XMaterial shader support is **already included** in the `usd-core` package. No additional installation needed!
+MaterialX shader support is **already included** in the `usd-core` package. No additional installation needed!
+
+**MaterialX** is an open standard for representing rich material and look-development content, launched at Industrial Light & Magic in 2012 and now hosted by the Academy Software Foundation. See [materialx.org](https://materialx.org/) and [GitHub](https://github.com/AcademySoftwareFoundation/MaterialX).
 
 ### **What's Included:**
 - `UsdMtlx` module (MaterialX support)
-- MaterialX Standard Surface shader support
-- XMaterial shader creation (MaterialX-based)
+- MaterialX Standard Surface shader support (`ND_standard_surface_surfaceshader`)
 - Houdini Karma compatibility
 - Nuke 17 MaterialX Standard Surface compatibility
+- Blender MaterialX compatibility (beta/future-proof)
 
 ### **Verification:**
 ```bash
@@ -31,10 +33,11 @@ from xstage import USDConverter, ConversionOptions
 
 # Auto-detect (recommended)
 options = ConversionOptions(material_shader_type="auto")
-# Will use XMaterial if MaterialX available, else UsdPreviewSurface
+# Will use MaterialX if available, else UsdPreviewSurface
 
-# Explicit XMaterial
-options = ConversionOptions(material_shader_type="XMaterial")
+# Explicit MaterialX
+options = ConversionOptions(material_shader_type="MaterialX")
+# Or use "XMaterial" for backward compatibility
 ```
 
 ### **If MaterialX Not Available:**
@@ -139,7 +142,7 @@ If Adobe plugins are not available, xStage falls back to:
 
 | Component | Type | Installation | Included in requirements.txt? |
 |-----------|------|--------------|-------------------------------|
-| **MaterialX/XMaterial** | USD Module | ✅ Included in usd-core | ✅ Yes (via usd-core) |
+| **MaterialX** | USD Module | ✅ Included in usd-core | ✅ Yes (via usd-core) |
 | **Adobe Plugins** | C++ Plugins | ⚠️ Install separately | ❌ No (C++ plugins, not Python) |
 
 ---
@@ -174,7 +177,7 @@ If Adobe plugins are not available, xStage falls back to:
 
 ## 📚 **Documentation**
 
-- **MaterialX/XMaterial**: See `docs/xmaterial-support.md`
+- **MaterialX**: See `docs/materialx-support.md`
 - **Adobe Plugins**: See `docs/adobe-plugin-formats.md`
 - **Houdini/Nuke Compatibility**: See `docs/HOUDINI_NUKE_COMPATIBILITY.md`
 - **Best Practices**: See `docs/BEST_MATERIAL_PRACTICES.md`

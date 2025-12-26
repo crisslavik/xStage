@@ -32,11 +32,13 @@ alembic>=1.8.0; python_version >= "3.9"  # Python Alembic library (optional fall
 # Note: All USD features (UsdLux, UsdShade, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils, UsdMtlx)
 # are included in usd-core package. No additional dependencies required for USD features.
 
-# MaterialX/XMaterial Support:
+# MaterialX Support:
 # - MaterialX (UsdMtlx) is included in usd-core package
-# - XMaterial shader support is built-in when MaterialX is available
-# - No additional Python packages needed for MaterialX/XMaterial
+# - MaterialX Standard Surface shader support is built-in when MaterialX is available
+# - No additional Python packages needed for MaterialX
+# - Official MaterialX: https://materialx.org/ and https://github.com/AcademySoftwareFoundation/MaterialX
 # - Check availability: python -c "from pxr import UsdMtlx; print('MaterialX available')"
+# - Note: "XMaterial" is an alias for MaterialX (maintained for backward compatibility)
 
 # Converter dependencies (optional, for format support):
 # - FBX: Requires USD FBX plugin (usdFbx) or Adobe USD Fileformat Plugins

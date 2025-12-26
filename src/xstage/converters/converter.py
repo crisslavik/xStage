@@ -26,7 +26,7 @@ class ConversionOptions:
     flip_y: bool = False
     flip_z: bool = False
     export_materials: bool = True
-    material_shader_type: str = "auto"  # "auto" (recommended), "XMaterial", "Karma", "Nuke", "MaterialX", "UsdPreviewSurface", "glTF_PBR"
+    material_shader_type: str = "auto"  # "auto" (recommended), "MaterialX", "Karma", "Nuke", "Blender", "XMaterial" (alias), "UsdPreviewSurface", "glTF_PBR"
     validate_materials: bool = True  # Validate materials for target application compatibility
     export_normals: bool = True
     export_uvs: bool = True
@@ -72,6 +72,8 @@ class USDConverter:
                 self.material_validator = MaterialValidator(target="karma")
             elif shader_type in ["Nuke", "nuke"]:
                 self.material_validator = MaterialValidator(target="nuke")
+            elif shader_type in ["Blender", "blender"]:
+                self.material_validator = MaterialValidator(target="blender")
             else:
                 self.material_validator = MaterialValidator(target="auto")
         else:

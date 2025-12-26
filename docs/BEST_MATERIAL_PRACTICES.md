@@ -5,15 +5,16 @@
 
 ## 🎯 **Recommended Strategy: Smart Material System**
 
-### **Best Choice: XMaterial with Smart Fallback**
+### **Best Choice: MaterialX with Smart Fallback**
 
 For a production VFX pipeline, the **best approach** is:
 
-1. **Primary: XMaterial (MaterialX-based)**
-   - Industry standard for VFX pipelines
+1. **Primary: MaterialX Standard Surface**
+   - Industry standard for VFX pipelines (ILM, Sony Pictures Imageworks, Pixar, Autodesk, Adobe, SideFX)
    - Maximum interoperability
-   - Future-proof
-   - Works with MaterialX-compatible renderers (Arnold, RenderMan, V-Ray, etc.)
+   - Future-proof (Academy Software Foundation hosted project)
+   - Works with MaterialX-compatible renderers (Arnold, RenderMan, Karma, V-Ray, etc.)
+   - Official standard: https://materialx.org/
 
 2. **Fallback: UsdPreviewSurface**
    - Universal compatibility
@@ -31,7 +32,7 @@ For a production VFX pipeline, the **best approach** is:
 
 | Shader Type | Interoperability | Renderer Support | Complexity | Best For |
 |------------|------------------|------------------|------------|----------|
-| **XMaterial** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Medium | Production pipelines |
+| **MaterialX** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Medium | Production pipelines |
 | **MaterialX** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Medium | Advanced workflows |
 | **UsdPreviewSurface** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Low | Universal compatibility |
 | **glTF_PBR** | ⭐⭐⭐ | ⭐⭐⭐ | Low | Web/real-time |
@@ -57,17 +58,17 @@ converter.convert("model.fbx", "model.usd")
 ```
 
 **Behavior:**
-- If MaterialX available → Use XMaterial
+- If MaterialX available → Use MaterialX Standard Surface
 - If MaterialX not available → Use UsdPreviewSurface
 - No manual configuration needed
 
-### **Option 2: Explicit XMaterial (RECOMMENDED for Production)**
+### **Option 2: Explicit MaterialX (RECOMMENDED for Production)**
 
-Explicitly use XMaterial for production workflows:
+Explicitly use MaterialX for production workflows:
 
 ```python
 options = ConversionOptions(
-    material_shader_type="XMaterial",
+    material_shader_type="MaterialX",  # Or "XMaterial" for backward compatibility
     export_materials=True
 )
 ```
@@ -82,7 +83,7 @@ options = ConversionOptions(
 Use different shaders based on source format:
 
 ```python
-# FBX → XMaterial (production assets)
+# FBX → MaterialX (production assets)
 # OBJ → UsdPreviewSurface (quick previews)
 # glTF → glTF_PBR (web assets)
 ```
@@ -96,13 +97,13 @@ Use different shaders based on source format:
 **Best approach**: Extract materials from source, then convert to target shader
 
 ```
-Source Format → Extract Material Data → Convert to XMaterial → USD
+Source Format → Extract Material Data → Convert to MaterialX → USD
 ```
 
 **Implementation:**
 - Extract all material properties from source
 - Normalize to standard format
-- Create XMaterial shader with extracted data
+- Create MaterialX Standard Surface shader with extracted data
 - Preserve texture paths and relationships
 
 ### 2. **Texture Handling**
@@ -164,7 +165,7 @@ from xstage import USDConverter, ConversionOptions
 options = ConversionOptions(
     # Material settings
     export_materials=True,
-    material_shader_type="XMaterial",  # Use XMaterial
+    material_shader_type="MaterialX",  # Use MaterialX Standard Surface
     
     # Geometry settings
     export_normals=True,
@@ -254,7 +255,7 @@ class MaterialCreator:
         if shader_type == "auto":
             # Auto-detect best available
             if MATERIALX_AVAILABLE:
-                self.shader_type = MaterialShaderType.XMATERIAL
+                self.shader_type = MaterialShaderType.MATERIALX
             else:
                 self.shader_type = MaterialShaderType.PREVIEW_SURFACE
         else:
@@ -309,7 +310,7 @@ def resolve_texture_path(texture_path: str, source_file: str) -> str:
 
 ### **For Your Pipeline:**
 
-1. **Default to XMaterial** with auto-fallback
+1. **Default to MaterialX** with auto-fallback
 2. **Enhanced extraction** from all source formats
 3. **Smart texture path** resolution
 4. **Collection-based binding** for efficiency
@@ -341,7 +342,7 @@ converter.convert("model.fbx", "model.usd")
 ```
 
 This will:
-- ✅ Use XMaterial if MaterialX available
+- ✅ Use MaterialX Standard Surface if MaterialX available
 - ✅ Fallback to UsdPreviewSurface if not
 - ✅ Extract materials from source
 - ✅ Create proper material bindings
@@ -351,7 +352,7 @@ This will:
 
 ## 🎯 **Summary**
 
-**Best Choice**: **XMaterial with auto-fallback**
+**Best Choice**: **MaterialX Standard Surface with auto-fallback**
 
 **Why:**
 - Industry standard (MaterialX)

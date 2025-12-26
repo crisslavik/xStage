@@ -5,7 +5,18 @@ All notable changes to xStage will be documented in this file.
 
 ---
 
-## [Unreleased] - Phase 1-3 Implementation
+## [Unreleased] - Phase 1-3 Implementation & CI Improvements
+
+### Fixed
+- **CI Workflow**: Fixed matrix configuration error (`runs-on: ${{ matrix.os }}` → `runs-on: ubuntu-22.04`)
+- **CI Workflow**: Added comprehensive timeouts to prevent "operation was canceled" errors
+- **CI Workflow**: Added Xvfb (X Virtual Framebuffer) for headless GUI testing
+- **CI Workflow**: Improved error handling with `continue-on-error` and fallbacks
+- **CI Workflow**: Optimized dependency installation (split into core/optional/dev stages)
+- **CI Workflow**: Added pip caching and better progress logging
+- **Tests**: Fixed all import paths to match new code structure (`xstage.core.viewer`, etc.)
+- **Tests**: Expanded test suite (753 lines across 5 test files)
+- **Tests**: Added tests for converters, managers, and utilities
 
 ### Added - Phase 1: Polish
 - **Theme System**: Dark, Light, and High Contrast themes with persistence
@@ -20,6 +31,9 @@ All notable changes to xStage will be documented in this file.
 ### Added - Phase 3: Visual Features
 - **AOV Visualization**: Render Var extraction and preview UI
 - **Texture/Material Preview**: Preview textures and materials on 3D geometry
+
+### Added - Material Support
+- **Blender MaterialX Support**: Added Blender shader type for future-proof material compatibility (beta)
 
 ### Changed
 - Updated viewer to integrate all new features

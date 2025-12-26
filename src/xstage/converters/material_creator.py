@@ -1,7 +1,10 @@
 """
 Material Creator for USD Conversion
-Creates USD materials with various shader types including MaterialX/XMaterial
-Enhanced for Houdini Karma and Nuke 17 compatibility
+Creates USD materials with various shader types including MaterialX Standard Surface
+Enhanced for Houdini Karma, Nuke 17, and Blender compatibility
+
+MaterialX is an open standard for representing rich material and look-development content.
+See: https://materialx.org/ and https://github.com/AcademySoftwareFoundation/MaterialX
 """
 
 from typing import Optional, Dict, List, Tuple
@@ -25,12 +28,11 @@ class MaterialShaderType:
     """Material shader types"""
     PREVIEW_SURFACE = "UsdPreviewSurface"  # Standard USD shader
     MATERIALX = "MaterialX"  # MaterialX shader
-    XMATERIAL = "XMaterial"  # Custom XMaterial shader (MaterialX-based)
+    XMATERIAL = "XMaterial"  # Alias for MaterialX Standard Surface (for backward compatibility)
     GLTF_PBR = "glTF_PBR"  # glTF PBR shader
     KARMA = "Karma"  # Houdini Karma-optimized MaterialX
     NUKE = "Nuke"  # Nuke 17 MaterialX Standard Surface
-    KARMA = "Karma"  # Houdini Karma-optimized MaterialX
-    NUKE = "Nuke"  # Nuke 17 MaterialX Standard Surface
+    BLENDER = "Blender"  # Blender MaterialX Standard Surface (beta/future-proof)
 
 
 class MaterialCreator:
@@ -42,18 +44,20 @@ class MaterialCreator:
         
         Args:
             shader_type: Type of shader to create:
-                - "auto" (RECOMMENDED): Auto-detect best available (XMaterial if MaterialX available, else UsdPreviewSurface)
-                - "XMaterial": MaterialX-based shader (best for production)
+                - "auto" (RECOMMENDED): Auto-detect best available (MaterialX if available, else UsdPreviewSurface)
+                - "MaterialX": MaterialX Standard Surface shader (best for production)
+                - "XMaterial": Alias for MaterialX (for backward compatibility)
                 - "Karma": Houdini Karma-optimized MaterialX
                 - "Nuke": Nuke 17 MaterialX Standard Surface
+                - "Blender": Blender MaterialX Standard Surface (beta/future-proof)
                 - "MaterialX": Standard MaterialX shader
                 - "UsdPreviewSurface": Standard USD shader (universal compatibility)
                 - "glTF_PBR": glTF PBR shader
         """
         if shader_type == "auto":
-            # Smart auto-detection: Use XMaterial if MaterialX available, else UsdPreviewSurface
+            # Smart auto-detection: Use MaterialX if available, else UsdPreviewSurface
             if MATERIALX_AVAILABLE:
-                self.shader_type = MaterialShaderType.XMATERIAL
+                self.shader_type = MaterialShaderType.MATERIALX
             else:
                 self.shader_type = MaterialShaderType.PREVIEW_SURFACE
         else:
@@ -81,7 +85,7 @@ class MaterialCreator:
             
             # Create shader based on type
             if self.shader_type in [MaterialShaderType.MATERIALX, MaterialShaderType.XMATERIAL, 
-                                    MaterialShaderType.KARMA, MaterialShaderType.NUKE]:
+                                    MaterialShaderType.KARMA, MaterialShaderType.NUKE, MaterialShaderType.BLENDER]:
                 return self._create_materialx_material(material, stage, material_path, material_data)
             elif self.shader_type == MaterialShaderType.GLTF_PBR:
                 return self._create_gltf_pbr_material(material, stage, material_path, material_data)
@@ -158,7 +162,7 @@ class MaterialCreator:
     def _create_materialx_material(self, material: UsdShade.Material,
                                   stage: Usd.Stage, material_path: str,
                                   material_data: Optional[Dict]) -> UsdShade.Material:
-        """Create material with MaterialX/XMaterial shader - Enhanced for Houdini Karma and Nuke 17"""
+        """Create material with MaterialX Standard Surface shader - Enhanced for Houdini Karma, Nuke 17, and Blender"""
         if not MATERIALX_AVAILABLE:
             # Fallback to PreviewSurface if MaterialX not available
             print("MaterialX not available, falling back to UsdPreviewSurface")
@@ -176,10 +180,14 @@ class MaterialCreator:
                 # Nuke 17 uses MaterialX Standard Surface
                 shader_id = "ND_standard_surface_surfaceshader"
                 shader_name = "NukeSurface"
+            elif self.shader_type == MaterialShaderType.BLENDER:
+                # Blender uses MaterialX Standard Surface (beta/future-proof)
+                shader_id = "ND_standard_surface_surfaceshader"
+                shader_name = "BlenderSurface"
             elif self.shader_type == MaterialShaderType.XMATERIAL:
-                # XMaterial - try custom first, fallback to standard
-                shader_id = "ND_standard_surface_surfaceshader"  # Standard MaterialX
-                shader_name = "XMaterial"
+                # XMaterial is an alias for MaterialX Standard Surface
+                shader_id = "ND_standard_surface_surfaceshader"  # MaterialX Standard Surface
+                shader_name = "MaterialXSurface"  # Use MaterialX naming
             else:
                 # Standard MaterialX
                 shader_id = "ND_standard_surface_surfaceshader"
@@ -303,11 +311,14 @@ class MaterialCreator:
             # Connect to material output
             material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "out")
             
-            # Add metadata for Houdini/Nuke compatibility
+            # Add metadata for Houdini/Nuke/Blender compatibility
             if self.shader_type == MaterialShaderType.KARMA:
                 material.GetPrim().SetMetadata("houdini:material", "karma")
             elif self.shader_type == MaterialShaderType.NUKE:
                 material.GetPrim().SetMetadata("nuke:material", "mtlx_standard_surface")
+            elif self.shader_type == MaterialShaderType.BLENDER:
+                material.GetPrim().SetMetadata("blender:material", "mtlx_standard_surface")
+                material.GetPrim().SetMetadata("blender:usd_materialx", "true")
             
             return material
         
