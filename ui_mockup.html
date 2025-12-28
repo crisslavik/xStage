@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xStage USD Viewer - UI Mockup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            overflow: hidden;
+        }
+
+        .main-window {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Menu Bar */
+        .menu-bar {
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            padding: 0;
+            display: flex;
+            height: 24px;
+            font-size: 13px;
+        }
+
+        .menu-item {
+            padding: 4px 12px;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        .menu-item:hover {
+            background: #3e3e42;
+        }
+
+        .menu-item.active {
+            background: #094771;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            padding: 4px 8px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toolbar-btn {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .toolbar-btn:hover {
+            background: #1177bb;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 20px;
+            background: #3e3e42;
+            margin: 0 4px;
+        }
+
+        /* Main Content Area */
+        .content-area {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left Dock - Scene Hierarchy */
+        .dock-left {
+            width: 280px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dock-title {
+            background: #2d2d30;
+            padding: 8px 12px;
+            font-weight: 600;
+            font-size: 12px;
+            border-bottom: 1px solid #3e3e42;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hierarchy-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            font-size: 13px;
+        }
+
+        .tree-item {
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tree-item:hover {
+            background: #2a2d2e;
+        }
+
+        .tree-item.selected {
+            background: #094771;
+        }
+
+        .tree-item.expanded::before {
+            content: '▼';
+            font-size: 10px;
+            width: 16px;
+        }
+
+        .tree-item.collapsed::before {
+            content: '▶';
+            font-size: 10px;
+            width: 16px;
+        }
+
+        .tree-icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Central Viewport */
+        .viewport-container {
+            flex: 1;
+            background: #1e1e1e;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viewport {
+            flex: 1;
+            background: linear-gradient(135deg, #1e1e1e 0%, #252526 100%);
+            position: relative;
+            border: 1px solid #3e3e42;
+            margin: 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6a6a6a;
+            font-size: 14px;
+        }
+
+        .viewport-overlay {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(30, 30, 30, 0.85);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            border: 1px solid #3e3e42;
+        }
+
+        .viewport-overlay-item {
+            margin: 2px 0;
+        }
+
+        /* Right Dock - Stage Info */
+        .dock-right {
+            width: 300px;
+            background: #252526;
+            border-left: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-section {
+            padding: 12px;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .info-section-title {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #cccccc;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+
+        .info-label {
+            color: #858585;
+        }
+
+        .info-value {
+            color: #d4d4d4;
+        }
+
+        .validate-btn {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .validate-btn:hover {
+            background: #1177bb;
+        }
+
+        /* Bottom Dock - Playback */
+        .dock-bottom {
+            height: 120px;
+            background: #252526;
+            border-top: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .playback-controls {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .timeline-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .timeline-slider {
+            flex: 1;
+            height: 6px;
+            background: #3e3e42;
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .timeline-slider::before {
+            content: '';
+            position: absolute;
+            left: 30%;
+            width: 2px;
+            height: 100%;
+            background: #0e639c;
+        }
+
+        .timeline-slider::after {
+            content: '';
+            position: absolute;
+            left: 30%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background: #0e639c;
+            border-radius: 50%;
+            border: 2px solid #1e1e1e;
+        }
+
+        .frame-label {
+            font-size: 12px;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .playback-buttons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .playback-btn {
+            background: #3e3e42;
+            color: #d4d4d4;
+            border: 1px solid #3e3e42;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            min-width: 40px;
+        }
+
+        .playback-btn:hover {
+            background: #4e4e52;
+        }
+
+        .playback-btn.play {
+            background: #0e639c;
+            color: white;
+        }
+
+        .playback-btn.play:hover {
+            background: #1177bb;
+        }
+
+        .fps-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .fps-input {
+            background: #3e3e42;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            padding: 4px 8px;
+            border-radius: 3px;
+            width: 60px;
+            font-size: 12px;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: #007acc;
+            color: white;
+            padding: 4px 12px;
+            font-size: 12px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        /* Dialog Overlay */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .dialog-overlay.show {
+            display: flex;
+        }
+
+        .dialog {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 20px;
+            min-width: 400px;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .dialog-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #d4d4d4;
+        }
+
+        .dialog-content {
+            color: #cccccc;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .dialog-btn {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .dialog-btn:hover {
+            background: #1177bb;
+        }
+
+        .dialog-btn.secondary {
+            background: #3e3e42;
+        }
+
+        .dialog-btn.secondary:hover {
+            background: #4e4e52;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-window">
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+            <div class="menu-item" onclick="showMenu('file')">File</div>
+            <div class="menu-item" onclick="showMenu('view')">View</div>
+            <div class="menu-item" onclick="showMenu('tools')">Tools</div>
+            <div class="menu-item" onclick="showMenu('help')">Help</div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button class="toolbar-btn" onclick="showDialog('Open USD file dialog')">Open USD</button>
+            <button class="toolbar-btn" onclick="showDialog('Import/Convert dialog')">Import/Convert</button>
+            <div class="toolbar-separator"></div>
+            <button class="toolbar-btn" onclick="alert('Frame All')">Frame All</button>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="content-area">
+            <!-- Left Dock - Scene Hierarchy -->
+            <div class="dock-left">
+                <div class="dock-title">Scene Hierarchy</div>
+                <div class="hierarchy-tree">
+                    <div class="tree-item expanded selected">
+                        <span class="tree-icon">📦</span>
+                        <span>Root</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 20px;">
+                        <span class="tree-icon">📦</span>
+                        <span>Geometry</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 20px;">
+                        <span class="tree-icon">📷</span>
+                        <span>Camera_01</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 20px;">
+                        <span class="tree-icon">💡</span>
+                        <span>Light_Key</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 20px;">
+                        <span class="tree-icon">🎨</span>
+                        <span>Materials</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 40px;">
+                        <span class="tree-icon">🎨</span>
+                        <span>Material_Standard</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 20px;">
+                        <span class="tree-icon">🔀</span>
+                        <span>VariantSet: model</span>
+                    </div>
+                    <div class="tree-item collapsed" style="margin-left: 20px;">
+                        <span class="tree-icon">📥</span>
+                        <span>Payload_Reference</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Central Viewport -->
+            <div class="viewport-container">
+                <div class="viewport">
+                    <div class="viewport-overlay">
+                        <div class="viewport-overlay-item">FPS: 60</div>
+                        <div class="viewport-overlay-item">Meshes: 12</div>
+                        <div class="viewport-overlay-item">Cameras: 1</div>
+                        <div class="viewport-overlay-item">Lights: 3</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🎬</div>
+                        <div>3D Viewport</div>
+                        <div style="font-size: 12px; margin-top: 8px; color: #6a6a6a;">
+                            OpenGL / Hydra 2.0 Rendering
+                        </div>
+                        <div style="font-size: 11px; margin-top: 16px; color: #6a6a6a;">
+                            Mouse: Rotate | Middle: Pan | Wheel: Zoom
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Dock - Stage Info -->
+            <div class="dock-right">
+                <div class="dock-title">Stage Info</div>
+                <div class="info-section">
+                    <div class="info-section-title">Stage Information</div>
+                    <div class="info-row">
+                        <span class="info-label">Path:</span>
+                        <span class="info-value">/path/to/file.usd</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Start Time:</span>
+                        <span class="info-value">0</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">End Time:</span>
+                        <span class="info-value">100</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">FPS:</span>
+                        <span class="info-value">24.0</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Up Axis:</span>
+                        <span class="info-value">Y</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Meters Per Unit:</span>
+                        <span class="info-value">0.01</span>
+                    </div>
+                </div>
+                <div class="info-section">
+                    <div class="info-section-title">Statistics</div>
+                    <div class="info-row">
+                        <span class="info-label">Meshes:</span>
+                        <span class="info-value">12</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cameras:</span>
+                        <span class="info-value">1</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Lights:</span>
+                        <span class="info-value">3</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Materials:</span>
+                        <span class="info-value">8</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Collections:</span>
+                        <span class="info-value">2</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Variants:</span>
+                        <span class="info-value">1</span>
+                    </div>
+                </div>
+                <div class="info-section">
+                    <button class="validate-btn" onclick="showDialog('USD Validation Results')">Validate USD</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Dock - Playback -->
+        <div class="dock-bottom">
+            <div class="dock-title">Playback</div>
+            <div class="playback-controls">
+                <div class="timeline-container">
+                    <div class="timeline-slider" onclick="updateTimeline(event)"></div>
+                    <div class="frame-label">Frame: 30</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="playback-buttons">
+                        <button class="playback-btn play" onclick="togglePlayback()">Play</button>
+                        <button class="playback-btn" onclick="alert('First Frame')">|&lt;</button>
+                        <button class="playback-btn" onclick="alert('Previous Frame')">&lt;</button>
+                        <button class="playback-btn" onclick="alert('Next Frame')">&gt;</button>
+                        <button class="playback-btn" onclick="alert('Last Frame')">&gt;|</button>
+                    </div>
+                    <div class="fps-control">
+                        <span>FPS:</span>
+                        <input type="number" class="fps-input" value="24" min="1" max="120">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            Ready
+        </div>
+    </div>
+
+    <!-- Dialog Overlay -->
+    <div class="dialog-overlay" id="dialogOverlay" onclick="closeDialog()">
+        <div class="dialog" onclick="event.stopPropagation()">
+            <div class="dialog-title" id="dialogTitle">Dialog Title</div>
+            <div class="dialog-content" id="dialogContent">Dialog content goes here...</div>
+            <div class="dialog-buttons">
+                <button class="dialog-btn secondary" onclick="closeDialog()">Cancel</button>
+                <button class="dialog-btn" onclick="closeDialog()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showMenu(menu) {
+            alert(`${menu.charAt(0).toUpperCase() + menu.slice(1)} menu clicked`);
+        }
+
+        function showDialog(content) {
+            document.getElementById('dialogTitle').textContent = content;
+            document.getElementById('dialogContent').textContent = content + ' functionality would appear here.';
+            document.getElementById('dialogOverlay').classList.add('show');
+        }
+
+        function closeDialog() {
+            document.getElementById('dialogOverlay').classList.remove('show');
+        }
+
+        function togglePlayback() {
+            const btn = event.target;
+            if (btn.textContent === 'Play') {
+                btn.textContent = 'Pause';
+                btn.style.background = '#d32f2f';
+            } else {
+                btn.textContent = 'Play';
+                btn.style.background = '#0e639c';
+            }
+        }
+
+        function updateTimeline(event) {
+            const slider = event.currentTarget;
+            const rect = slider.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percent = (x / rect.width) * 100;
+            slider.style.setProperty('--position', percent + '%');
+            
+            const frameLabel = document.querySelector('.frame-label');
+            const frame = Math.round(percent);
+            frameLabel.textContent = `Frame: ${frame}`;
+        }
+
+        // Close dialog on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDialog();
+            }
+        });
+    </script>
+</body>
+</html>
