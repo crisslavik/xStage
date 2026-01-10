@@ -10,9 +10,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from typing import Optional, List
 
-from .viewer import USDStageManager
-from .viewport import ViewportWidget
-from .hydra_viewport import HydraViewportWidget
+from .core import USDStageManager, ViewportWidget
+from .rendering import HydraViewportWidget
 
 
 class MultiViewportWidget(QWidget):
