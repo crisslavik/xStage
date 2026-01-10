@@ -60,7 +60,7 @@ except ImportError:
 ```
 
 #### **4. Version-Agnostic Requirements** 🟡 **MODERATE**
-- **requirements.txt**: `usd-core>=23.11` (allows newer versions)
+- **requirements.txt**: `usd-core>=25.11` (requires USD 25.11+)
 - **No hard version lock**: Can upgrade USD without code changes (if API compatible)
 
 ---

@@ -1,7 +1,8 @@
 # USD Viewer Requirements for Linux (Ubuntu, RHEL9, RHEL10, AlmaLinux)
 
 # Core USD support
-usd-core>=23.11
+# Requires USD 25.11+ for full feature support (light linking, enhanced DOF, etc.)
+usd-core>=25.11
 
 # Qt GUI framework
 PySide6>=6.6.0
