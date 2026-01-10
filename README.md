@@ -163,6 +163,10 @@ See [Platform Support Guide](docs/platform-support.md) for detailed installation
 
 ### Installation
 
+xStage supports two installation methods:
+
+#### Method 1: Self-Contained Installation (Recommended)
+
 xStage uses a **self-contained installation** that automatically installs Python 3.11, USD 25.11+, OCIO 2.2+, and QuiltiX - all isolated within the xStage directory.
 
 **Quick Install:**
@@ -191,16 +195,38 @@ source .xstage_venv/bin/activate
 python3 src/xstage/core/viewer.py
 ```
 
-**Dependencies (automatically installed):**
-- Python 3.11 (installed self-contained if not available)
-- OpenUSD 25.11+ (usd-core) - automatically installed
-- OCIO 2.2+ (PyOpenColorIO) - automatically installed
-- QuiltiX (MaterialX editor) - automatically installed
-- PySide6 (Qt bindings) - automatically installed
-- NumPy - automatically installed
-- All other dependencies - automatically installed
-
 **Note:** Everything is self-contained in the xStage directory. No system-wide packages or symlinks are created.
+
+#### Method 2: Manual pip Installation
+
+If you prefer to install xStage manually using pip (requires Python 3.9+ and existing USD/OCIO installations):
+
+```bash
+git clone https://github.com/crisslavik/xStage
+cd xStage
+pip install -e .
+```
+
+**Run xStage:**
+```bash
+# Using the entry point command (recommended)
+xstage
+
+# Or using Python module
+python -m xstage.core.viewer
+
+# Or directly
+python src/xstage/core/viewer.py
+```
+
+**Dependencies (must be installed separately):**
+- Python 3.9+ (3.11 recommended)
+- OpenUSD 25.11+ (`usd-core>=25.11`)
+- OCIO 2.2+ (`PyOpenColorIO>=2.2.0`)
+- QuiltiX (`quiltix>=1.0.0`) - optional
+- PySide6 (Qt bindings)
+- NumPy
+- See `requirements.txt` for complete list
 
 ### Basic Usage
 
