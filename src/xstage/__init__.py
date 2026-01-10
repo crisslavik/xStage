@@ -16,9 +16,13 @@ from .rendering import (
 )
 
 # UI
-from .ui.widgets import (
-    AxisOrientationWidget,
-)
+try:
+    from .ui.widgets import (
+        AxisOrientationWidget,
+    )
+except ImportError:
+    # AxisOrientationWidget is optional
+    AxisOrientationWidget = None
 
 from .ui.editors import (
     AnimationCurveEditorWidget,
@@ -119,7 +123,11 @@ __all__ = [
     # Rendering
     "HydraViewportWidget",
     # UI Widgets
-    "AxisOrientationWidget",
+]
+# Add AxisOrientationWidget to __all__ only if it exists
+if AxisOrientationWidget is not None:
+    __all__.append("AxisOrientationWidget")
+__all__.extend([
     # UI Editors
     "AnimationCurveEditorWidget",
     "AnnotationsWidget",

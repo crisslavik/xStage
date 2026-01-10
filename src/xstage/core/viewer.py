@@ -25,8 +25,20 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 try:
-    from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, Kind, UsdLux, UsdCollectionAPI, UsdRender, UsdSkel, UsdUtils
+    from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, Kind, UsdLux, UsdRender, UsdSkel, UsdUtils
     USD_AVAILABLE = True
+    # Try to import UsdCollectionAPI separately as it may not be available in all USD versions
+    try:
+        from pxr import UsdCollectionAPI
+    except ImportError:
+        # UsdCollectionAPI not available - create fallback class
+        class UsdCollectionAPI:
+            @staticmethod
+            def GetAllCollectionAPIs(prim):
+                return []
+            @staticmethod
+            def ApplyCollection(prim, name, **kwargs):
+                return None
 except ImportError:
     USD_AVAILABLE = False
     print("Warning: USD Python bindings not found. Install with: pip install usd-core")
@@ -35,7 +47,12 @@ except ImportError:
     class UsdLux:
         pass
     class UsdCollectionAPI:
-        pass
+        @staticmethod
+        def GetAllCollectionAPIs(prim):
+            return []
+        @staticmethod
+        def ApplyCollection(prim, name, **kwargs):
+            return None
     class UsdRender:
         pass
     class UsdSkel:
