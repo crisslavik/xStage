@@ -43,6 +43,21 @@ except ImportError:
     class UsdUtils:
         pass
 
+# Import USD version detection
+try:
+    from ..utils.usd_version import (
+        USD_VERSION_STRING, USD_VERSION_TUPLE, USD_FEATURES,
+        USD_VERSION_AT_LEAST, check_feature
+    )
+except ImportError:
+    USD_VERSION_STRING = None
+    USD_VERSION_TUPLE = (0, 0, 0)
+    USD_FEATURES = {}
+    def USD_VERSION_AT_LEAST(major, minor=0, patch=0):
+        return False
+    def check_feature(feature_name):
+        return False
+
 import numpy as np
 
 # Import from reorganized structure
@@ -864,6 +879,7 @@ class USDViewerWindow(QMainWindow):
         self.material_editor_widget = None
         self.scene_search_widget = None
         self.camera_manager_widget = None
+        self.light_manager_widget = None
         self.prim_properties_widget = None
         self.collection_editor_widget = None
         self.primvar_editor_widget = None
@@ -887,6 +903,7 @@ class USDViewerWindow(QMainWindow):
         from ..utils.bookmarks import BookmarkManager
         from ..utils.theme_manager import ThemeManager
         from ..utils.cache_manager import CacheManager
+        from ..utils.ocio_manager import OCIOManager
         from ..managers.selection_sets import SelectionSetManager
         from ..managers.lod_manager import LODManager
         from ..managers.instancing_manager import InstancingManager
@@ -897,6 +914,26 @@ class USDViewerWindow(QMainWindow):
         self.theme_manager = ThemeManager(self)
         self.cache_manager = CacheManager()
         self.selection_set_manager = SelectionSetManager()
+        
+        # Initialize OCIO manager for color-accurate asset review
+        # Load OCIO config path from preferences
+        from PySide6.QtCore import QSettings
+        settings = QSettings("xStage", "xStage")
+        ocio_config_path = settings.value("ocio/config_path", "", type=str) or None
+        
+        self.ocio_manager = OCIOManager(config_path=ocio_config_path)
+        self.current_color_space = None
+        self.display_color_space = None
+        if self.ocio_manager.is_available():
+            self.display_color_space = self.ocio_manager.get_display_color_space()
+        
+        # Initialize QuiltiX manager for MaterialX editing
+        from ..managers.quiltix_manager import QuiltiXManager
+        self.quiltix_manager = QuiltiXManager()
+        
+        # Initialize light linking manager
+        from ..managers.light_linking_manager import LightLinkingManager
+        self.light_linking_manager = None
         self.lod_manager = LODManager()
         self.instancing_manager = InstancingManager()
         
@@ -1118,6 +1155,20 @@ class USDViewerWindow(QMainWindow):
         batch_operations_action.triggered.connect(self.show_batch_operations)
         tools_menu.addAction(batch_operations_action)
         
+        # Settings menu
+        settings_menu = menubar.addMenu("&Settings")
+        
+        preferences_action = QAction("&Preferences...", self)
+        preferences_action.setShortcut(QKeySequence("Ctrl+,"))
+        preferences_action.triggered.connect(self.show_preferences)
+        settings_menu.addAction(preferences_action)
+        
+        settings_menu.addSeparator()
+        
+        ocio_settings_action = QAction("&OCIO Color Management...", self)
+        ocio_settings_action.triggered.connect(self.show_ocio_settings)
+        settings_menu.addAction(ocio_settings_action)
+        
         # Help menu
         help_menu = menubar.addMenu("&Help")
         
@@ -1187,6 +1238,29 @@ class USDViewerWindow(QMainWindow):
             stats_layout.addRow(key.replace('_', ' ').title() + ":", label)
         stats_group.setLayout(stats_layout)
         layout.addWidget(stats_group)
+        
+        # OCIO Color Space Info
+        ocio_group = QGroupBox("Color Management (OCIO)")
+        ocio_layout = QFormLayout()
+        
+        self.ocio_status_label = QLabel("Not Available")
+        ocio_layout.addRow("Status:", self.ocio_status_label)
+        
+        self.ocio_asset_cs_label = QLabel("-")
+        ocio_layout.addRow("Asset Color Space:", self.ocio_asset_cs_label)
+        
+        self.ocio_display_cs_label = QLabel("-")
+        ocio_layout.addRow("Display Color Space:", self.ocio_display_cs_label)
+        
+        self.ocio_config_label = QLabel("-")
+        ocio_layout.addRow("OCIO Config:", self.ocio_config_label)
+        
+        ocio_settings_btn = QPushButton("Configure OCIO...")
+        ocio_settings_btn.clicked.connect(self.show_ocio_settings)
+        ocio_layout.addRow("", ocio_settings_btn)
+        
+        ocio_group.setLayout(ocio_layout)
+        layout.addWidget(ocio_group)
         
         # Validation button
         validate_btn = QPushButton("Validate USD")
@@ -1370,6 +1444,54 @@ class USDViewerWindow(QMainWindow):
                     
                     # Update selection set manager
                     self.selection_set_manager.stage = self.stage_manager.stage
+                    
+                    # Initialize light linking manager
+                    if self.light_linking_manager is None:
+                        from ..managers.light_linking_manager import LightLinkingManager
+                        self.light_linking_manager = LightLinkingManager(self.stage_manager.stage)
+                    else:
+                        self.light_linking_manager.stage = self.stage_manager.stage
+            
+            # Detect color space from USD using OCIO
+            if self.ocio_manager.is_available() and self.stage_manager.stage:
+                color_space_info = self.ocio_manager.get_color_space_info(self.stage_manager.stage)
+                self.current_color_space = color_space_info.get('asset_color_space')
+                
+                # Update viewport overlay with color space info
+                if self.viewport_overlay:
+                    self.viewport_overlay.set_color_space_info(color_space_info)
+                
+                # Update info dock with OCIO info
+                if hasattr(self, 'ocio_status_label'):
+                    self.ocio_status_label.setText("✓ Available")
+                    self.ocio_status_label.setStyleSheet("color: green;")
+                    self.ocio_asset_cs_label.setText(color_space_info.get('asset_color_space', 'Unknown'))
+                    self.ocio_display_cs_label.setText(color_space_info.get('display_color_space', 'Unknown'))
+                    self.ocio_config_label.setText(color_space_info.get('config_name', 'Unknown'))
+            else:
+                # Update info dock to show OCIO not available
+                if hasattr(self, 'ocio_status_label'):
+                    if self.ocio_manager.ocio_available:
+                        self.ocio_status_label.setText("✗ Config Not Loaded")
+                        self.ocio_status_label.setStyleSheet("color: orange;")
+                    else:
+                        self.ocio_status_label.setText("✗ Not Available")
+                        self.ocio_status_label.setStyleSheet("color: red;")
+                    self.ocio_asset_cs_label.setText("-")
+                    self.ocio_display_cs_label.setText("-")
+                    self.ocio_config_label.setText("-")
+            
+            # Calculate and display scene metrics
+            from ..utils.scene_metrics import SceneMetricsCalculator
+            scene_metrics = SceneMetricsCalculator.calculate_all_metrics(
+                self.stage_manager.stage,
+                geometry_data,
+                filepath
+            )
+            
+            # Update viewport overlay with scene metrics
+            if self.viewport_overlay:
+                self.viewport_overlay.set_scene_metrics(scene_metrics)
             
             # Update viewport overlay with stats
             if hasattr(self, 'viewport_overlay') and self.viewport_overlay:
@@ -1759,6 +1881,32 @@ class USDViewerWindow(QMainWindow):
                     dock.raise_()
                     break
     
+    def show_light_manager(self):
+        """Show light manager dock"""
+        if not self.light_manager_widget:
+            from ..ui.editors.light_manager_ui import LightManagerWidget
+            self.light_manager_widget = LightManagerWidget()
+            self.light_manager_widget.look_through_light.connect(self.look_through_light)
+            self.light_manager_widget.light_changed.connect(self.on_light_changed)
+            dock = QDockWidget("Light Management", self)
+            dock.setWidget(self.light_manager_widget)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            if self.stage_manager.stage:
+                self.light_manager_widget.set_stage(self.stage_manager.stage)
+        else:
+            for dock in self.findChildren(QDockWidget):
+                if dock.widget() == self.light_manager_widget:
+                    dock.show()
+                    dock.raise_()
+                    break
+    
+    def on_light_changed(self, light_path: str):
+        """Handle light property change"""
+        # Update viewport if needed
+        if self.viewport:
+            self.viewport.update()
+        self.statusBar().showMessage(f"Light updated: {light_path}", 2000)
+    
     def show_prim_properties(self):
         """Show prim properties dock"""
         if not self.prim_properties_widget:
@@ -1826,6 +1974,121 @@ class USDViewerWindow(QMainWindow):
                     dock.show()
                     dock.raise_()
                     break
+    
+    def launch_quiltix(self):
+        """Launch QuiltiX MaterialX editor"""
+        if not self.quiltix_manager.is_available():
+            QMessageBox.warning(
+                self, 
+                "QuiltiX Not Available",
+                "QuiltiX is not installed or not found in PATH.\n\n"
+                "Install with: pip install quiltix\n"
+                "Or ensure 'quiltix' command is available."
+            )
+            return
+        
+        if not self.current_file or not self.stage_manager.stage:
+            QMessageBox.warning(
+                self,
+                "No USD File",
+                "Please open a USD file first before launching QuiltiX."
+            )
+            return
+        
+        # Launch QuiltiX with current USD file
+        success = self.quiltix_manager.launch_quiltix(self.current_file)
+        
+        if success:
+            self.statusBar().showMessage(
+                f"QuiltiX launched with {self.current_file}", 
+                3000
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Launch Failed",
+                "Failed to launch QuiltiX. Check console for errors."
+            )
+    
+    def look_through_light(self, light_prim_path: str):
+        """
+        Look through a light (view scene from light's perspective)
+        
+        Args:
+            light_prim_path: Path to light prim
+        """
+        if not USD_AVAILABLE or not self.stage_manager.stage:
+            return
+        
+        try:
+            from pxr import UsdLux, UsdGeom, Gf
+            import numpy as np
+            
+            light_prim = self.stage_manager.stage.GetPrimAtPath(light_prim_path)
+            if not light_prim:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Light",
+                    f"Light not found: {light_prim_path}"
+                )
+                return
+            
+            # Check if it's a light
+            if not light_prim.IsA(UsdLux.Light):
+                QMessageBox.warning(
+                    self,
+                    "Invalid Light",
+                    f"Prim is not a light: {light_prim_path}"
+                )
+                return
+            
+            # Get light transform
+            xformable = UsdGeom.Xformable(light_prim)
+            transform = xformable.ComputeLocalToWorldTransform(self.stage_manager.current_time)
+            
+            # Extract position and orientation
+            position = transform.ExtractTranslation()
+            rotation = transform.ExtractRotation()
+            
+            # Calculate forward direction (light direction)
+            # For directional lights, use the -Z axis
+            # For point lights, we'll look at the scene center
+            forward = Gf.Vec3d(0, 0, -1)
+            rotation_matrix = rotation.GetMatrix()
+            forward = rotation_matrix.TransformDir(forward)
+            
+            # Set viewport camera to light's position and orientation
+            if hasattr(self.viewport, 'camera_target'):
+                self.viewport.camera_target = np.array([position[0], position[1], position[2]])
+            
+            # Calculate camera distance (use current distance or default)
+            if hasattr(self.viewport, 'camera_distance'):
+                current_distance = self.viewport.camera_distance
+            
+            # Calculate rotation angles from forward direction
+            # This is a simplified approach - could be improved
+            forward_np = np.array([forward[0], forward[1], forward[2]])
+            forward_np = forward_np / np.linalg.norm(forward_np)
+            
+            # Calculate rotation angles
+            if hasattr(self.viewport, 'camera_rotation_y'):
+                self.viewport.camera_rotation_y = np.degrees(np.arctan2(forward_np[0], forward_np[2]))
+            if hasattr(self.viewport, 'camera_rotation_x'):
+                self.viewport.camera_rotation_x = np.degrees(np.arcsin(-forward_np[1]))
+            
+            # Update viewport
+            self.viewport.update()
+            
+            self.statusBar().showMessage(
+                f"Looking through light: {light_prim.GetName()}", 
+                3000
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Look-Through Failed",
+                f"Error looking through light:\n{e}"
+            )
     
     def on_camera_selected(self, camera_path: str):
         """Handle camera selection"""
@@ -2231,6 +2494,58 @@ class USDViewerWindow(QMainWindow):
     def on_selection_set_double_clicked(self, item):
         """Handle double-click on selection set"""
         self.apply_selection_set()
+    
+    def show_preferences(self):
+        """Show preferences dialog"""
+        from ..ui.editors.preferences_ui import PreferencesDialog
+        
+        dialog = PreferencesDialog(self)
+        if dialog.exec():
+            # Reload OCIO manager with new settings
+            self.reload_ocio_manager()
+            self.statusBar().showMessage("Preferences saved", 3000)
+    
+    def reload_ocio_manager(self):
+        """Reload OCIO manager with preferences"""
+        from PySide6.QtCore import QSettings
+        from ..utils.ocio_manager import OCIOManager
+        
+        settings = QSettings("xStage", "xStage")
+        config_path = settings.value("ocio/config_path", "", type=str) or None
+        
+        # Reinitialize OCIO manager with new config
+        self.ocio_manager = OCIOManager(config_path=config_path)
+        
+        # Update UI if stage is loaded
+        if self.stage_manager.stage and self.ocio_manager.is_available():
+            color_space_info = self.ocio_manager.get_color_space_info(self.stage_manager.stage)
+            if hasattr(self, 'ocio_status_label'):
+                self.ocio_status_label.setText("✓ Available")
+                self.ocio_status_label.setStyleSheet("color: green;")
+                self.ocio_asset_cs_label.setText(color_space_info.get('asset_color_space', 'Unknown'))
+                self.ocio_display_cs_label.setText(color_space_info.get('display_color_space', 'Unknown'))
+                self.ocio_config_label.setText(color_space_info.get('config_name', 'Unknown'))
+                if self.viewport_overlay:
+                    self.viewport_overlay.set_color_space_info(color_space_info)
+    
+    def show_ocio_settings(self):
+        """Show OCIO color management settings dialog"""
+        from ..ui.editors.ocio_settings_ui import OCIOSettingsDialog
+        
+        dialog = OCIOSettingsDialog(self, self.ocio_manager)
+        if dialog.exec():
+            # Config was reloaded, update color space info if stage is loaded
+            if self.stage_manager.stage and self.ocio_manager.is_available():
+                color_space_info = self.ocio_manager.get_color_space_info(self.stage_manager.stage)
+                self.current_color_space = color_space_info.get('asset_color_space')
+                
+                if self.viewport_overlay:
+                    self.viewport_overlay.set_color_space_info(color_space_info)
+                
+                self.statusBar().showMessage(
+                    f"OCIO config updated: {self.ocio_manager.get_config_name()}", 
+                    3000
+                )
     
     def show_about(self):
         """Show about dialog"""

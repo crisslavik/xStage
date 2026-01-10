@@ -7,9 +7,9 @@
   
   **Extended USD Viewer for Production Pipelines**
   
-  [![CI](https://github.com/xstage-pipeline/xstage/workflows/CI/badge.svg)](...)
+  [![CI](https://github.com/crisslavik/xStage/workflows/CI/badge.svg)](...)
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](...)
-  [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](...)
+  [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](...)
   [![OpenUSD](https://img.shields.io/badge/OpenUSD-25.11-blue.svg)](...)
   
   [Features](#-features) • [Install](#-installation) • [Quick Start](#-quick-start) • [Docs](#-documentation)
@@ -24,14 +24,18 @@
 **xStage** is a professional, production-ready USD viewer and converter built for VFX pipelines. It combines the power of OpenUSD with an intuitive interface and comprehensive toolset designed for real-world production workflows.
 
 ```bash
-# View USD files
-xstage scene.usd
+# Install xStage (self-contained, includes Python 3.11, USD 25.11+, OCIO 2.2+, QuiltiX)
+git clone https://github.com/crisslavik/xStage
+cd xStage
+./scripts/install.sh
 
-# Convert FBX to USD with scale correction
-xstage model.fbx --export output.usd --scale 0.01
+# Launch xStage
+./launch_usd_viewer.sh
 
-# Convert with axis correction
-xstage imported.obj --up-axis Z --flip-y
+# Then use the GUI for:
+# - Viewing USD files (File → Open USD)
+# - Converting formats (File → Import & Convert)
+# - Editing materials, lights, cameras, and more
 ```
 
 ---
@@ -70,6 +74,8 @@ xstage imported.obj --up-axis Z --flip-y
 - **Scene Hierarchy** - Full scene graph navigation with icons and indicators
 - **Timeline & Playback** - Full animation timeline with scrubbing and playback controls
 - **Camera Controls** - Intuitive rotate, pan, zoom with frame-all support
+- **Depth of Field (DOF)** - Camera focus distance and f-stop controls (USD 25.11+)
+- **Look-Through Lights** - View scene from light's perspective (USD 25.11+)
 - **Measured Grid** - Houdini-style reference grid with real-world units
 - **Payload Management** - Load/unload payloads for performance optimization
 
@@ -77,11 +83,14 @@ xstage imported.obj --up-axis Z --flip-y
 - **Layer Composition** - Visualize and manage USD layer stack (subLayers, references, payloads)
 - **Animation Curve Editor** - Edit animation curves with graph editor and keyframe manipulation
 - **Material Editor** - Edit material properties, shader networks, and assignments
+- **Light Management** - Manage lights, properties, and light linking (USD 25.11+)
+- **Light Linking** - Control which lights affect which objects (USD 25.11+)
 - **Prim Properties** - Edit transforms, attributes, and prim properties
 - **Collection Editor** - Manage collection membership and material bindings
 - **Primvar Editor** - Edit primvar values and interpolation modes
 - **Render Settings** - Configure render settings, cameras, and AOVs
 - **Namespace Editing** - Rename and move prims with namespace management
+- **OCIO Preferences** - Configure color management with custom OCIO config files
 
 ### 🔍 Search & Navigation
 - **Scene Graph Search** - Advanced search and filtering by name, type, path, metadata
@@ -125,7 +134,9 @@ xstage imported.obj --up-axis Z --flip-y
 - **Pipeline Configuration** - Easy integration with VFX pipelines
 - **Asset Path Management** - Standard asset path resolution
 - **Shot Stage Creation** - Create standard shot structures
-- **Nuke/Houdini/Blender Export** - Optimized export for pipeline tools (Nuke 17 beta, Blender stable)
+- **Nuke/Houdini/Blender Export** - Optimized export for pipeline tools (Nuke 17 beta with USD support, Blender latest release)
+- **OCIO Color Management** - Full OpenColorIO 2.2+ integration for color-accurate asset review
+- **QuiltiX Integration** - Launch QuiltiX MaterialX editor for material editing
 
 ### 📚 Help & Documentation
 - **Help System** - In-app help with context-sensitive tooltips
@@ -152,40 +163,100 @@ See [Platform Support Guide](docs/platform-support.md) for detailed installation
 
 ### Installation
 
-**PyPI:**
+xStage supports two installation methods:
+
+#### Method 1: Self-Contained Installation (Recommended)
+
+xStage uses a **self-contained installation** that automatically installs Python 3.11, USD 25.11+, OCIO 2.2+, and QuiltiX - all isolated within the xStage directory.
+
+**Quick Install:**
 ```bash
-pip install xstage
+git clone https://github.com/crisslavik/xStage
+cd xStage
+./scripts/install.sh
 ```
 
-**From source:**
+The installation script will:
+- ✅ Install Python 3.11 (self-contained in `.xstage_python/`)
+- ✅ Create virtual environment with Python 3.11 (`.xstage_venv/`)
+- ✅ Automatically install USD 25.11+ (`usd-core>=25.11`)
+- ✅ Automatically install OCIO 2.2+ (`PyOpenColorIO>=2.2.0`)
+- ✅ Automatically install QuiltiX (`quiltix>=1.0.0`)
+- ✅ Install all other dependencies
+- ✅ Create launch script (`./launch_usd_viewer.sh`)
+
+**Run xStage:**
 ```bash
-git clone https://github.com/xstage-pipeline/xstage
-cd xstage
+# Using launch script (recommended)
+./launch_usd_viewer.sh
+
+# Or manually
+source .xstage_venv/bin/activate
+python3 src/xstage/core/viewer.py
+```
+
+**Note:** Everything is self-contained in the xStage directory. No system-wide packages or symlinks are created.
+
+#### Method 2: Manual pip Installation
+
+If you prefer to install xStage manually using pip (requires Python 3.9+ and existing USD/OCIO installations):
+
+```bash
+git clone https://github.com/crisslavik/xStage
+cd xStage
 pip install -e .
 ```
 
-**Dependencies:**
-- Python 3.9+
+**Run xStage:**
+```bash
+# Using the entry point command (recommended)
+xstage
+
+# Or using Python module
+python -m xstage.core.viewer
+
+# Or directly
+python src/xstage/core/viewer.py
+```
+
+**Dependencies (must be installed separately):**
+- Python 3.9+ (3.11 recommended)
+- OpenUSD 25.11+ (`usd-core>=25.11`)
+- OCIO 2.2+ (`PyOpenColorIO>=2.2.0`)
+- QuiltiX (`quiltix>=1.0.0`) - optional
 - PySide6 (Qt bindings)
-- OpenUSD 25.11+ (usd-core)
 - NumPy
-- Optional: trimesh (for OBJ/STL/PLY conversion)
-- Optional: pygltflib (for glTF conversion)
+- See `requirements.txt` for complete list
 
 ### Basic Usage
 
+After installation, launch xStage and use the GUI:
+
 ```bash
-# View USD file
-xstage scene.usd
+# Launch xStage
+./launch_usd_viewer.sh
 
-# Convert FBX to USD with scale correction
-xstage model.fbx --export output.usd --scale 0.01
+# Or if virtual environment is activated
+python3 src/xstage/core/viewer.py
+```
 
-# Convert with axis correction
-xstage imported.obj --up-axis Z --flip-y
+**In the GUI:**
+- **File → Open USD** - Open USD files (.usd, .usda, .usdc, .usdz)
+- **File → Import & Convert** - Convert other formats (FBX, OBJ, glTF, etc.) to USD
+- **Tools → Material Editor** - Edit materials and shaders
+- **Tools → Animation Curve Editor** - Edit animation curves
+- **Tools → Camera Management** - Manage cameras and depth of field
+- **Tools → Light Management** - Manage lights and light linking (USD 25.11+)
+- **View → Preferences** - Configure OCIO color management
 
-# Combine fixes
-xstage import.obj --scale 0.001 --up-axis Z --flip-z
+**Command Line (Python API):**
+```python
+from xstage.core.viewer import USDViewerWindow
+
+# Create viewer
+viewer = USDViewerWindow()
+viewer.load_usd_file("scene.usd")
+viewer.show()
 ```
 
 ### Python API
@@ -223,10 +294,11 @@ converter.convert("model.fbx", "model.usd")
 ## 🎯 Use Cases
 
 ### Asset Review
-```bash
-# Quick asset check with proper scale
-xstage /pipeline/assets/character.fbx --scale 0.01
-```
+1. Launch xStage: `./launch_usd_viewer.sh`
+2. **File → Import & Convert** - Import FBX/OBJ/glTF files
+3. Configure scale and axis correction in the conversion dialog
+4. Review assets with proper color management (OCIO)
+5. Use **Tools → Light Management** for lighting review (USD 25.11+)
 
 ### Animation Editing
 - Edit animation curves directly in viewer
@@ -268,11 +340,11 @@ for f in files:
 
 ## 📖 Documentation
 
-- **[User Guide](docs/user-guide.md)** - Complete user documentation
-- **[Pipeline Integration](docs/pipeline.md)** - Pipeline setup and integration
-- **[API Reference](docs/api.md)** - Complete API documentation
-- **[Feature List](ADDED_FEATURES.md)** - All implemented features
-- **[Future Features](FUTURE_FEATURES.md)** - Planned enhancements
+- **[Feature List](docs/ADDED_FEATURES.md)** - All implemented features
+- **[Future Features](docs/FUTURE_FEATURES.md)** - Planned enhancements
+- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation guide
+- **[Platform Support](docs/platform-support.md)** - Installation by platform
+- **[Material Support](docs/materialx-support.md)** - MaterialX and shader support
 
 ---
 
@@ -321,8 +393,8 @@ All advanced features are accessible from the **Tools** menu:
 ## 🤝 Community
 
 - **[Discord](https://discord.gg/xstage)** - Chat with the community
-- **[GitHub Discussions](https://github.com/xstage-pipeline/xstage/discussions)** - Q&A and discussions
-- **[Issues](https://github.com/xstage-pipeline/xstage/issues)** - Bug reports and feature requests
+- **[GitHub Discussions](https://github.com/crisslavik/xStage/discussions)** - Q&A and discussions
+- **[Issues](https://github.com/crisslavik/xStage/issues)** - Bug reports and feature requests
 
 ---
 

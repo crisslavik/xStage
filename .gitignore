@@ -10,6 +10,9 @@ dist/
 *.egg-info/
 venv/
 env/
+.xstage_venv/
+.xstage_python/
+.python_build/
 
 # IDE
 .vscode/

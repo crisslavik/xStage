@@ -1,7 +1,8 @@
 # USD Viewer Requirements for Linux (Ubuntu, RHEL9, RHEL10, AlmaLinux)
 
 # Core USD support
-usd-core>=23.11
+# Requires USD 25.11+ for full feature support (light linking, enhanced DOF, etc.)
+usd-core>=25.11
 
 # Qt GUI framework
 PySide6>=6.6.0
@@ -19,6 +20,12 @@ Pillow>=10.0.0  # For texture/material preview widget
 
 # System monitoring (for viewport overlay)
 psutil>=5.9.0  # For memory/system stats in viewport HUD
+
+# Color management (for color-accurate asset review)
+PyOpenColorIO>=2.2.0  # OpenColorIO Python bindings for color space management
+
+# MaterialX editor (optional, for material editing)
+quiltix>=1.0.0; python_version >= "3.9"  # QuiltiX MaterialX editor (optional)
 
 # Format conversion support
 pygltflib>=1.16.0  # For glTF/GLB import

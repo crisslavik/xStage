@@ -229,7 +229,7 @@ xStage automatically finds USD installation:
 
 **Solutions:**
 1. Ensure USD is properly installed
-2. Check USD version (requires USD 23.11+)
+2. Check USD version (requires USD 25.11+)
 3. Verify CMake can find USD:
    ```bash
    cmake -DUSD_ROOT=/path/to/usd ..

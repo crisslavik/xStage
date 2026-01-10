@@ -11,12 +11,14 @@ try:
     from .coordinate_systems import CoordinateSystemManager
     from .instancing_manager import InstancingManager, InstanceInfo, InstanceMode
     from .layer_composition import LayerCompositionManager
+    from .light_linking_manager import LightLinkingManager
     from .lod_manager import LODManager, LODLevel, LODMode
     from .materials import MaterialManager
     from .namespace_editing import NamespaceEditor
     from .openexec_support import OpenExecManager
     from .payloads import PayloadManager
     from .prim_selection import PrimSelectionManager
+    from .quiltix_manager import QuiltiXManager
     from .scene_comparison import SceneComparator
     from .scene_search import SceneSearchManager
     from .selection_sets import SelectionSetManager, SelectionSet, SelectionSetOperation
@@ -37,6 +39,7 @@ try:
         "InstanceInfo",
         "InstanceMode",
         "LayerCompositionManager",
+        "LightLinkingManager",
         "LODManager",
         "LODLevel",
         "LODMode",
@@ -45,6 +48,7 @@ try:
         "OpenExecManager",
         "PayloadManager",
         "PrimSelectionManager",
+        "QuiltiXManager",
         "SceneComparator",
         "SceneSearchManager",
         "SelectionSetManager",

@@ -373,6 +373,10 @@ class ViewportWidget(QOpenGLWidget):
         
         for mesh in self.geometry_data['meshes']:
             self.draw_mesh(mesh)
+        
+        # Draw light visualization
+        if 'lights' in self.geometry_data:
+            self.draw_lights()
     
     def draw_mesh(self, mesh: dict):
         """Draw a single mesh"""
@@ -412,6 +416,266 @@ class ViewportWidget(QOpenGLWidget):
             idx += count
             
         glPopMatrix()
+    
+    def draw_lights(self):
+        """Draw light visualization (icons, cones, direction indicators)"""
+        if not self.geometry_data or 'lights' not in self.geometry_data:
+            return
+        
+        glDisable(GL_LIGHTING)
+        glLineWidth(2.0)
+        
+        for light_data in self.geometry_data['lights']:
+            self.draw_light_icon(light_data)
+    
+    def draw_light_icon(self, light_data: dict):
+        """Draw a single light icon"""
+        try:
+            position = light_data.get('position', np.array([0, 0, 0]))
+            light_type = light_data.get('type', 'Unknown')
+            color = light_data.get('color', (1.0, 1.0, 1.0))
+            intensity = light_data.get('intensity', 1.0)
+            direction = light_data.get('direction', np.array([0, 0, -1]))
+            
+            # Normalize direction
+            if np.linalg.norm(direction) > 0:
+                direction = direction / np.linalg.norm(direction)
+            
+            # Set color based on light color and intensity
+            glColor3f(color[0] * min(intensity / 10.0, 1.0), 
+                     color[1] * min(intensity / 10.0, 1.0), 
+                     color[2] * min(intensity / 10.0, 1.0))
+            
+            glPushMatrix()
+            glTranslatef(position[0], position[1], position[2])
+            
+            # Draw different icons based on light type
+            if 'SphereLight' in light_type or 'Point' in light_type:
+                radius = light_data.get('radius', 0.1)
+                self._draw_sphere_light_icon(radius)
+            
+            elif 'RectLight' in light_type:
+                width = light_data.get('width', 1.0)
+                height = light_data.get('height', 1.0)
+                self._draw_rect_light_icon(width, height, direction)
+            
+            elif 'DiskLight' in light_type:
+                radius = light_data.get('radius', 0.5)
+                self._draw_disk_light_icon(radius, direction)
+            
+            elif 'DistantLight' in light_type or 'Directional' in light_type:
+                self._draw_distant_light_icon(direction)
+            
+            elif 'CylinderLight' in light_type:
+                radius = light_data.get('radius', 0.5)
+                length = light_data.get('length', 1.0)
+                self._draw_cylinder_light_icon(radius, length)
+            
+            else:
+                # Default: draw a small sphere
+                self._draw_sphere_light_icon(0.1)
+            
+            # Draw direction indicator (arrow)
+            if 'DistantLight' not in light_type and 'Directional' not in light_type:
+                cone_angle = light_data.get('cone_angle')
+                if cone_angle:
+                    self._draw_cone_indicator(direction, cone_angle)
+                else:
+                    self._draw_direction_arrow(direction)
+            
+            glPopMatrix()
+        except Exception as e:
+            print(f"Error drawing light icon: {e}")
+    
+    def _draw_sphere_light_icon(self, radius: float):
+        """Draw sphere light icon"""
+        # Draw a wireframe sphere (simplified - just draw a circle)
+        segments = 16
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            glVertex3f(x, y, 0)
+        glEnd()
+        
+        # Draw perpendicular circles for 3D effect
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            z = radius * np.sin(angle)
+            glVertex3f(x, 0, z)
+        glEnd()
+        
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            y = radius * np.cos(angle)
+            z = radius * np.sin(angle)
+            glVertex3f(0, y, z)
+        glEnd()
+    
+    def _draw_rect_light_icon(self, width: float, height: float, direction: np.ndarray):
+        """Draw rectangular light icon"""
+        # Draw a rectangle perpendicular to direction
+        # Simplified: draw a square
+        size = max(width, height) * 0.5
+        
+        glBegin(GL_LINE_LOOP)
+        glVertex3f(-size, -size, 0)
+        glVertex3f(size, -size, 0)
+        glVertex3f(size, size, 0)
+        glVertex3f(-size, size, 0)
+        glEnd()
+        
+        # Draw direction arrow
+        self._draw_direction_arrow(direction)
+    
+    def _draw_disk_light_icon(self, radius: float, direction: np.ndarray):
+        """Draw disk light icon"""
+        segments = 32
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            glVertex3f(x, y, 0)
+        glEnd()
+        
+        # Draw direction arrow
+        self._draw_direction_arrow(direction)
+    
+    def _draw_distant_light_icon(self, direction: np.ndarray):
+        """Draw distant/directional light icon"""
+        # Draw a sun-like icon (circle with rays)
+        radius = 0.2
+        segments = 8
+        
+        # Draw circle
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            glVertex3f(x, y, 0)
+        glEnd()
+        
+        # Draw rays
+        ray_length = radius * 1.5
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x1 = radius * np.cos(angle)
+            y1 = radius * np.sin(angle)
+            x2 = ray_length * np.cos(angle)
+            y2 = ray_length * np.sin(angle)
+            
+            glBegin(GL_LINES)
+            glVertex3f(x1, y1, 0)
+            glVertex3f(x2, y2, 0)
+            glEnd()
+        
+        # Draw direction arrow (longer for distant lights)
+        arrow_length = 2.0
+        arrow_dir = direction * arrow_length
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(arrow_dir[0], arrow_dir[1], arrow_dir[2])
+        glEnd()
+    
+    def _draw_cylinder_light_icon(self, radius: float, length: float):
+        """Draw cylinder light icon"""
+        segments = 16
+        half_length = length * 0.5
+        
+        # Draw cylinder outline
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            glVertex3f(x, y, -half_length)
+        glEnd()
+        
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            glVertex3f(x, y, half_length)
+        glEnd()
+        
+        # Draw connecting lines
+        for i in range(0, segments, 4):
+            angle = 2 * np.pi * i / segments
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            
+            glBegin(GL_LINES)
+            glVertex3f(x, y, -half_length)
+            glVertex3f(x, y, half_length)
+            glEnd()
+    
+    def _draw_cone_indicator(self, direction: np.ndarray, cone_angle: float):
+        """Draw cone angle indicator for spot lights"""
+        cone_length = 1.0
+        cone_radius = cone_length * np.tan(np.radians(cone_angle))
+        
+        # Draw cone outline
+        segments = 16
+        glBegin(GL_LINE_LOOP)
+        glVertex3f(0, 0, 0)  # Tip at origin
+        for i in range(segments):
+            angle = 2 * np.pi * i / segments
+            x = cone_radius * np.cos(angle)
+            y = cone_radius * np.sin(angle)
+            z = -cone_length
+            glVertex3f(x, y, z)
+        glEnd()
+        
+        # Draw lines from tip to base
+        for i in range(0, segments, 4):
+            angle = 2 * np.pi * i / segments
+            x = cone_radius * np.cos(angle)
+            y = cone_radius * np.sin(angle)
+            z = -cone_length
+            
+            glBegin(GL_LINES)
+            glVertex3f(0, 0, 0)
+            glVertex3f(x, y, z)
+            glEnd()
+    
+    def _draw_direction_arrow(self, direction: np.ndarray):
+        """Draw direction arrow"""
+        arrow_length = 0.5
+        arrow_head_size = 0.1
+        
+        # Arrow shaft
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        arrow_end = direction * arrow_length
+        glVertex3f(arrow_end[0], arrow_end[1], arrow_end[2])
+        glEnd()
+        
+        # Arrow head (simplified - triangle)
+        arrow_end = direction * arrow_length
+        # Perpendicular vectors for arrow head
+        if abs(direction[0]) < 0.9:
+            perp = np.array([1, 0, 0])
+        else:
+            perp = np.array([0, 1, 0])
+        perp = perp - np.dot(perp, direction) * direction
+        perp = perp / np.linalg.norm(perp)
+        
+        head1 = arrow_end - direction * arrow_head_size + perp * arrow_head_size * 0.5
+        head2 = arrow_end - direction * arrow_head_size - perp * arrow_head_size * 0.5
+        
+        glBegin(GL_LINES)
+        glVertex3f(arrow_end[0], arrow_end[1], arrow_end[2])
+        glVertex3f(head1[0], head1[1], head1[2])
+        glVertex3f(arrow_end[0], arrow_end[1], arrow_end[2])
+        glVertex3f(head2[0], head2[1], head2[2])
+        glEnd()
         
     def mousePressEvent(self, event):
         """Handle mouse press"""

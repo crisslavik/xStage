@@ -153,7 +153,7 @@ If Adobe plugins are not available, xStage falls back to:
 
 1. **Install usd-core** (includes MaterialX):
    ```bash
-   pip install usd-core>=23.11
+   pip install usd-core>=25.11
    ```
 
 2. **Install Adobe Plugins** (optional, for FBX support):

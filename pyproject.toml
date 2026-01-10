@@ -24,7 +24,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux :: Red Hat",
 ]
 dependencies = [
-    "usd-core>=23.11",
+    "usd-core>=25.11",
     "PySide6>=6.6.0",
     "PySide6-Addons>=6.6.0",
     "PyOpenGL>=3.1.7",
