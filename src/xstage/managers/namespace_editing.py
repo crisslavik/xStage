@@ -5,13 +5,49 @@ Based on OpenUSD 25.11 specifications
 """
 
 from typing import Optional, Dict, List
-from pxr import Usd, UsdNamespaceEditor, Sdf
 
 try:
-    from pxr import Usd, UsdNamespaceEditor, Sdf
+    from pxr import Usd, Sdf
+    # Try to import UsdNamespaceEditor separately as it may not be available in all USD versions
+    try:
+        from pxr import UsdNamespaceEditor
+        USD_NAMESPACE_EDITOR_AVAILABLE = True
+    except ImportError:
+        # UsdNamespaceEditor not available - create fallback class
+        class UsdNamespaceEditor:
+            def __init__(self, stage):
+                self.stage = stage
+            def CanEditNamespace(self, old_path, new_path):
+                return False
+            def EditNamespace(self, old_path, new_path):
+                return False
+            def CanApplyEdits(self):
+                return (False, ["UsdNamespaceEditor not available"])
+            def ApplyEdits(self):
+                return False
+        USD_NAMESPACE_EDITOR_AVAILABLE = False
     USD_AVAILABLE = True
 except ImportError:
     USD_AVAILABLE = False
+    USD_NAMESPACE_EDITOR_AVAILABLE = False
+    # Create dummy classes
+    class Usd:
+        class Stage:
+            pass
+    class Sdf:
+        class Path:
+            pass
+    class UsdNamespaceEditor:
+        def __init__(self, stage):
+            self.stage = stage
+        def CanEditNamespace(self, old_path, new_path):
+            return False
+        def EditNamespace(self, old_path, new_path):
+            return False
+        def CanApplyEdits(self):
+            return (False, ["UsdNamespaceEditor not available"])
+        def ApplyEdits(self):
+            return False
 
 
 class NamespaceEditor:
@@ -19,7 +55,7 @@ class NamespaceEditor:
     
     def __init__(self, stage: Usd.Stage):
         self.stage = stage
-        self.editor = UsdNamespaceEditor(stage) if USD_AVAILABLE else None
+        self.editor = UsdNamespaceEditor(stage) if (USD_AVAILABLE and USD_NAMESPACE_EDITOR_AVAILABLE) else None
     
     def can_rename(self, old_path: str, new_name: str) -> bool:
         """Check if a prim can be renamed"""
