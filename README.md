@@ -7,7 +7,7 @@
   
   **Extended USD Viewer for Production Pipelines**
   
-  [![CI](https://github.com/xstage-pipeline/xstage/workflows/CI/badge.svg)](...)
+  [![CI](https://github.com/crisslavik/xStage/workflows/CI/badge.svg)](...)
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](...)
   [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](...)
   [![OpenUSD](https://img.shields.io/badge/OpenUSD-25.11-blue.svg)](...)
@@ -25,8 +25,8 @@
 
 ```bash
 # Install xStage (self-contained, includes Python 3.11, USD 25.11+, OCIO 2.2+, QuiltiX)
-git clone https://github.com/xstage-pipeline/xstage
-cd xstage
+git clone https://github.com/crisslavik/xStage
+cd xStage
 ./scripts/install.sh
 
 # Launch xStage
@@ -167,8 +167,8 @@ xStage uses a **self-contained installation** that automatically installs Python
 
 **Quick Install:**
 ```bash
-git clone https://github.com/xstage-pipeline/xstage
-cd xstage
+git clone https://github.com/crisslavik/xStage
+cd xStage
 ./scripts/install.sh
 ```
 
@@ -367,8 +367,8 @@ All advanced features are accessible from the **Tools** menu:
 ## 🤝 Community
 
 - **[Discord](https://discord.gg/xstage)** - Chat with the community
-- **[GitHub Discussions](https://github.com/xstage-pipeline/xstage/discussions)** - Q&A and discussions
-- **[Issues](https://github.com/xstage-pipeline/xstage/issues)** - Bug reports and feature requests
+- **[GitHub Discussions](https://github.com/crisslavik/xStage/discussions)** - Q&A and discussions
+- **[Issues](https://github.com/crisslavik/xStage/issues)** - Bug reports and feature requests
 
 ---
 
