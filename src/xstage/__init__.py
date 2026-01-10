@@ -205,4 +205,4 @@ __all__.extend([
     "AppConfig",
     # Multi-viewport
     "MultiViewportWidget",
-]
+])
