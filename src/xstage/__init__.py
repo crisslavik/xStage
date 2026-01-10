@@ -50,7 +50,6 @@ from .managers import (
     CoordinateSystemManager,
     LayerCompositionManager,
     MaterialManager,
-    NamespaceEditor,
     OpenExecManager,
     PayloadManager,
     PrimSelectionManager,
@@ -61,6 +60,11 @@ from .managers import (
     UndoRedoManager,
     VariantManager,
 )
+# NamespaceEditor is optional
+try:
+    from .managers import NamespaceEditor
+except ImportError:
+    NamespaceEditor = None
 
 # Converters
 from .converters import (
@@ -124,9 +128,11 @@ __all__ = [
     "HydraViewportWidget",
     # UI Widgets
 ]
-# Add AxisOrientationWidget to __all__ only if it exists
+# Add optional components to __all__ only if they exist
 if AxisOrientationWidget is not None:
     __all__.append("AxisOrientationWidget")
+if NamespaceEditor is not None:
+    __all__.append("NamespaceEditor")
 __all__.extend([
     # UI Editors
     "AnimationCurveEditorWidget",
@@ -164,7 +170,6 @@ __all__.extend([
     "LODLevel",
     "LODMode",
     "MaterialManager",
-    "NamespaceEditor",
     "OpenExecManager",
     "PayloadManager",
     "PrimSelectionManager",

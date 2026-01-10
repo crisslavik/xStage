@@ -14,7 +14,12 @@ try:
     from .light_linking_manager import LightLinkingManager
     from .lod_manager import LODManager, LODLevel, LODMode
     from .materials import MaterialManager
-    from .namespace_editing import NamespaceEditor
+    # NamespaceEditor is optional (depends on UsdNamespaceEditor which may not be available)
+    try:
+        from .namespace_editing import NamespaceEditor
+    except ImportError as e:
+        NamespaceEditor = None
+        print(f"Warning: NamespaceEditor not available: {e}")
     from .openexec_support import OpenExecManager
     from .payloads import PayloadManager
     from .prim_selection import PrimSelectionManager
@@ -44,7 +49,6 @@ try:
         "LODLevel",
         "LODMode",
         "MaterialManager",
-        "NamespaceEditor",
         "OpenExecManager",
         "PayloadManager",
         "PrimSelectionManager",
@@ -58,6 +62,9 @@ try:
         "UndoRedoManager",
         "VariantManager",
     ]
+    # Add NamespaceEditor to __all__ only if it exists
+    if NamespaceEditor is not None:
+        __all__.append("NamespaceEditor")
 except ImportError as e:
     __all__ = []
     print(f"Warning: Some managers could not be imported: {e}")
