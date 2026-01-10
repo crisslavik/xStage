@@ -124,3 +124,7 @@ class USDValidator:
                 'info': [],
             }
 
+
+# Alias for backward compatibility
+ValidationManager = USDValidator
+

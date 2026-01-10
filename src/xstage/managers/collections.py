@@ -5,13 +5,42 @@ Based on OpenUSD 25.11 specifications
 """
 
 from typing import Optional, Dict, List
-from pxr import Usd, UsdCollectionAPI, Sdf
 
 try:
-    from pxr import Usd, UsdCollectionAPI, Sdf
+    from pxr import Usd, Sdf
+    # Try to import UsdCollectionAPI separately as it may not be available in all USD versions
+    try:
+        from pxr import UsdCollectionAPI
+    except ImportError:
+        # UsdCollectionAPI not available - create fallback class
+        class UsdCollectionAPI:
+            @staticmethod
+            def GetAllCollectionAPIs(prim):
+                return []
+            @staticmethod
+            def ApplyCollection(prim, name, **kwargs):
+                return None
+        USD_COLLECTION_AVAILABLE = False
+    else:
+        USD_COLLECTION_AVAILABLE = True
     USD_AVAILABLE = True
 except ImportError:
     USD_AVAILABLE = False
+    USD_COLLECTION_AVAILABLE = False
+    # Create dummy classes
+    class Usd:
+        class Prim:
+            pass
+    class Sdf:
+        class Path:
+            pass
+    class UsdCollectionAPI:
+        @staticmethod
+        def GetAllCollectionAPIs(prim):
+            return []
+        @staticmethod
+        def ApplyCollection(prim, name, **kwargs):
+            return None
 
 
 class CollectionManager:

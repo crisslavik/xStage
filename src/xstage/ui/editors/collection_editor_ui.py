@@ -6,7 +6,7 @@ Edit collection membership and properties
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QLabel, QPushButton, QLineEdit, QComboBox, QGroupBox, QFormLayout,
-    QListWidget, QListWidgetItem, QCheckBox
+    QListWidget, QListWidgetItem, QCheckBox, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal
 from typing import Optional
@@ -132,8 +132,13 @@ class CollectionEditorWidget(QWidget):
         self.current_prim = prim
         
         # Get collection API
-        from pxr import UsdCollectionAPI
-        self.current_collection_api = UsdCollectionAPI(prim, data['collection_name'])
+        try:
+            from pxr import UsdCollectionAPI
+            self.current_collection_api = UsdCollectionAPI(prim, data['collection_name'])
+        except ImportError:
+            QMessageBox.warning(self, "Collection API Not Available", 
+                              "UsdCollectionAPI is not available in this USD version.")
+            return
         
         # Load collection properties
         collection = self.current_collection_api.GetCollection()
