@@ -102,8 +102,11 @@ from .utils import (
     ViewportOverlay,
 )
 
-# Config
-from .config import AppConfig
+# Config (optional - config.py may be empty)
+try:
+    from .config import AppConfig
+except ImportError:
+    AppConfig = None
 
 # Multi-viewport
 from .multi_viewport import MultiViewportWidget
@@ -125,6 +128,8 @@ if NamespaceEditor is not None:
     __all__.append("NamespaceEditor")
 if ConverterDialog is not None:
     __all__.append("ConverterDialog")
+if AppConfig is not None:
+    __all__.append("AppConfig")
 __all__.extend([
     # UI Editors
     "AnimationCurveEditorWidget",
@@ -197,8 +202,6 @@ __all__.extend([
     "UsdLuxExtractor",
     "ValidationManager",
     "ViewportOverlay",
-    # Config
-    "AppConfig",
     # Multi-viewport
     "MultiViewportWidget",
 ])
