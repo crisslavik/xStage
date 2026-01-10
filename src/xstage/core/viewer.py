@@ -2678,6 +2678,18 @@ class USDViewerWindow(QMainWindow):
 
 def main():
     """Application entry point"""
+    # Auto-detect display server and set appropriate Qt platform
+    # This handles both X11 and Wayland environments
+    if 'QT_QPA_PLATFORM' not in os.environ:
+        # Check if running under Wayland
+        wayland_display = os.environ.get('WAYLAND_DISPLAY')
+        xdg_session_type = os.environ.get('XDG_SESSION_TYPE', '').lower()
+        
+        if wayland_display or xdg_session_type == 'wayland':
+            # Use Wayland if available
+            os.environ['QT_QPA_PLATFORM'] = 'wayland'
+        # Otherwise, Qt will default to xcb (X11)
+    
     app = QApplication(sys.argv)
     app.setApplicationName("USD Viewer")
     app.setOrganizationName("NOX VFX")
