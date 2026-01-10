@@ -1,4 +1,28 @@
 # Changelog
+
+## [Unreleased]
+
+### Added
+- **USD Version Detection**: Runtime USD version detection and feature flags
+  - New module: `src/xstage/utils/usd_version.py`
+  - Feature flags for version-specific features (light_linking, dof, etc.)
+  - Helper functions: `USD_VERSION_AT_LEAST()`, `check_feature()`
+  - Integrated into core modules for better maintainability
+
+### Changed
+- **Documentation Cleanup**: Removed 4 outdated/redundant documentation files
+  - Removed `docs/xmaterial-support.md` (redundant with materialx-support.md)
+  - Removed `DOCUMENTATION_CONSOLIDATION.md` (outdated)
+  - Removed `CODE_ORGANIZATION_PLAN.md` (outdated)
+  - Removed `MIGRATION_NOTES.md` (outdated)
+  - Updated `DOCUMENTATION_INDEX.md` to reflect current structure
+
+### Improved
+- **Maintainability**: Added USD version detection for easier future updates
+- **Code Organization**: Integrated version detection into light_linking_manager
+- **Documentation**: Cleaner, more organized documentation structure
+
+---
 ## xStage USD Viewer & Converter
 
 All notable changes to xStage will be documented in this file.

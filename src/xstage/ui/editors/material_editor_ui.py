@@ -54,6 +54,11 @@ class MaterialEditorWidget(QWidget):
         refresh_btn.clicked.connect(self.refresh)
         list_layout.addWidget(refresh_btn)
         
+        # QuiltiX button
+        quiltix_btn = QPushButton("Open in QuiltiX")
+        quiltix_btn.clicked.connect(self.open_in_quiltix)
+        list_layout.addWidget(quiltix_btn)
+        
         list_widget.setLayout(list_layout)
         splitter.addWidget(list_widget)
         
@@ -96,6 +101,21 @@ class MaterialEditorWidget(QWidget):
         """Set the USD stage"""
         self.stage = stage
         self.refresh()
+    
+    def open_in_quiltix(self):
+        """Open selected material in QuiltiX"""
+        if not self.current_material_prim:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "No Material Selected",
+                "Please select a material first."
+            )
+            return
+        
+        # Emit signal to parent to launch QuiltiX
+        # The parent (viewer) will handle the launch
+        self.material_changed.emit("quiltix:" + str(self.current_material_prim.GetPath()))
     
     def refresh(self):
         """Refresh material list"""

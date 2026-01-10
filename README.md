@@ -268,11 +268,11 @@ for f in files:
 
 ## 📖 Documentation
 
-- **[User Guide](docs/user-guide.md)** - Complete user documentation
-- **[Pipeline Integration](docs/pipeline.md)** - Pipeline setup and integration
-- **[API Reference](docs/api.md)** - Complete API documentation
-- **[Feature List](ADDED_FEATURES.md)** - All implemented features
-- **[Future Features](FUTURE_FEATURES.md)** - Planned enhancements
+- **[Feature List](docs/ADDED_FEATURES.md)** - All implemented features
+- **[Future Features](docs/FUTURE_FEATURES.md)** - Planned enhancements
+- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation guide
+- **[Platform Support](docs/platform-support.md)** - Installation by platform
+- **[Material Support](docs/materialx-support.md)** - MaterialX and shader support
 
 ---
 

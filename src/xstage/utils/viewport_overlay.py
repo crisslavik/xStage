@@ -44,6 +44,8 @@ class ViewportOverlay(QWidget):
         self.stats: Dict[str, any] = {}
         self.selected_prim: Optional[str] = None
         self.camera_info: Dict[str, any] = {}
+        self.color_space_info: Dict[str, any] = {}
+        self.scene_metrics: Dict[str, any] = {}
         
         # Memory tracking
         self.memory_usage = 0.0
@@ -89,6 +91,16 @@ class ViewportOverlay(QWidget):
     def set_camera_info(self, info: Dict[str, any]):
         """Set camera information"""
         self.camera_info = info
+        self.update()
+    
+    def set_color_space_info(self, info: Dict[str, any]):
+        """Set color space information"""
+        self.color_space_info = info
+        self.update()
+    
+    def set_scene_metrics(self, metrics: Dict[str, any]):
+        """Set scene performance metrics"""
+        self.scene_metrics = metrics
         self.update()
     
     def paintEvent(self, event):
@@ -174,6 +186,119 @@ class ViewportOverlay(QWidget):
             painter.fillRect(bg_rect, bg_color)
             painter.setPen(QPen(text_color))
             painter.drawText(x_offset, y_offset + text_rect.height(), camera_text)
+            y_offset += line_height + 5
+        
+        # Draw color space info (if OCIO available)
+        if self.color_space_info and self.color_space_info.get('ocio_available', False):
+            asset_cs = self.color_space_info.get('asset_color_space', 'Unknown')
+            display_cs = self.color_space_info.get('display_color_space', 'Unknown')
+            config_name = self.color_space_info.get('config_name', 'Unknown')
+            
+            color_space_text = f"Color Space: {asset_cs} → {display_cs}"
+            if config_name and config_name != "Unknown":
+                color_space_text += f" ({config_name})"
+            
+            text_rect = painter.fontMetrics().boundingRect(color_space_text)
+            bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+            bg_rect.moveTopLeft((x_offset, y_offset))
+            
+            painter.fillRect(bg_rect, bg_color)
+            painter.setPen(QPen(highlight_color))
+            painter.drawText(x_offset, y_offset + text_rect.height(), color_space_text)
+            y_offset += line_height + 5
+        
+        # Draw scene metrics (performance stats)
+        if self.scene_metrics:
+            y_offset += 5  # Spacing
+            
+            # Polygon count
+            polygon_counts = self.scene_metrics.get('polygon_counts', {})
+            if polygon_counts:
+                total_polys = polygon_counts.get('total_polygons', 0)
+                total_objs = polygon_counts.get('total_objects', 0)
+                poly_text = f"Polygons: {total_polys:,} ({total_objs} objects)"
+                
+                text_rect = painter.fontMetrics().boundingRect(poly_text)
+                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+                bg_rect.moveTopLeft((x_offset, y_offset))
+                
+                painter.fillRect(bg_rect, bg_color)
+                painter.setPen(QPen(text_color))
+                painter.drawText(x_offset, y_offset + text_rect.height(), poly_text)
+                y_offset += line_height
+            
+            # Texture memory
+            texture_memory = self.scene_metrics.get('texture_memory', {})
+            if texture_memory:
+                tex_mem = texture_memory.get('total_memory_mb', 0.0)
+                tex_count = texture_memory.get('texture_count', 0)
+                tex_text = f"Textures: {tex_mem:.1f} MB ({tex_count} textures)"
+                
+                text_rect = painter.fontMetrics().boundingRect(tex_text)
+                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+                bg_rect.moveTopLeft((x_offset, y_offset))
+                
+                painter.fillRect(bg_rect, bg_color)
+                painter.setPen(QPen(text_color))
+                painter.drawText(x_offset, y_offset + text_rect.height(), tex_text)
+                y_offset += line_height
+            
+            # Draw calls
+            draw_calls = self.scene_metrics.get('draw_calls', {})
+            if draw_calls:
+                est_draws = draw_calls.get('estimated_draw_calls', 0)
+                draw_text = f"Draw Calls: ~{est_draws}"
+                
+                text_rect = painter.fontMetrics().boundingRect(draw_text)
+                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+                bg_rect.moveTopLeft((x_offset, y_offset))
+                
+                painter.fillRect(bg_rect, bg_color)
+                painter.setPen(QPen(text_color))
+                painter.drawText(x_offset, y_offset + text_rect.height(), draw_text)
+                y_offset += line_height
+            
+            # File size
+            file_size = self.scene_metrics.get('file_size', {})
+            if file_size and file_size.get('total_size_mb', 0) > 0:
+                file_mb = file_size.get('total_size_mb', 0.0)
+                size_text = f"File Size: {file_mb:.2f} MB"
+                
+                text_rect = painter.fontMetrics().boundingRect(size_text)
+                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+                bg_rect.moveTopLeft((x_offset, y_offset))
+                
+                painter.fillRect(bg_rect, bg_color)
+                painter.setPen(QPen(text_color))
+                painter.drawText(x_offset, y_offset + text_rect.height(), size_text)
+                y_offset += line_height
+            
+            # Complexity score
+            complexity = self.scene_metrics.get('complexity', {})
+            if complexity:
+                score = complexity.get('score', 0.0)
+                level = complexity.get('level', 'Unknown')
+                color_name = complexity.get('color', 'white')
+                
+                # Map color name to QColor
+                color_map = {
+                    'green': QColor(100, 255, 100, 255),
+                    'yellow': QColor(255, 255, 100, 255),
+                    'orange': QColor(255, 165, 0, 255),
+                    'red': QColor(255, 100, 100, 255),
+                    'white': text_color
+                }
+                complexity_color = color_map.get(color_name, text_color)
+                
+                complexity_text = f"Complexity: {score:.1f}/100 ({level})"
+                
+                text_rect = painter.fontMetrics().boundingRect(complexity_text)
+                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+                bg_rect.moveTopLeft((x_offset, y_offset))
+                
+                painter.fillRect(bg_rect, bg_color)
+                painter.setPen(QPen(complexity_color))
+                painter.drawText(x_offset, y_offset + text_rect.height(), complexity_text)
         
         # Draw bottom-right corner info (grid, axis)
         if self.show_grid:

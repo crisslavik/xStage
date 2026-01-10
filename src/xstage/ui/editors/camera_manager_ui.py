@@ -101,6 +101,32 @@ class CameraManagerWidget(QWidget):
         props_group.setLayout(props_layout)
         layout.addWidget(props_group)
         
+        # Depth of Field (DOF) - USD 25.11 feature
+        dof_group = QGroupBox("Depth of Field (DOF)")
+        dof_layout = QFormLayout()
+        
+        self.focus_distance_spin = QDoubleSpinBox()
+        self.focus_distance_spin.setRange(0.1, 100000.0)
+        self.focus_distance_spin.setDecimals(2)
+        self.focus_distance_spin.setSuffix(" units")
+        self.focus_distance_spin.setSpecialValueText("Auto")
+        self.focus_distance_spin.valueChanged.connect(self.on_property_changed)
+        dof_layout.addRow("Focus Distance:", self.focus_distance_spin)
+        
+        self.f_stop_spin = QDoubleSpinBox()
+        self.f_stop_spin.setRange(0.1, 128.0)
+        self.f_stop_spin.setDecimals(1)
+        self.f_stop_spin.setSpecialValueText("Disabled")
+        self.f_stop_spin.valueChanged.connect(self.on_property_changed)
+        dof_layout.addRow("F-Stop (f/):", self.f_stop_spin)
+        
+        dof_info = QLabel("Lower f-stop = shallower depth of field")
+        dof_info.setStyleSheet("color: gray; font-size: 9px;")
+        dof_layout.addRow("", dof_info)
+        
+        dof_group.setLayout(dof_layout)
+        layout.addWidget(dof_group)
+        
         layout.addStretch()
         self.setLayout(layout)
     
@@ -155,6 +181,17 @@ class CameraManagerWidget(QWidget):
             projection_index = self.projection_combo.findText(camera_info['projection'])
             if projection_index >= 0:
                 self.projection_combo.setCurrentIndex(projection_index)
+            
+            # Load DOF properties (USD 25.11)
+            if camera_info.get('focus_distance') is not None:
+                self.focus_distance_spin.setValue(camera_info['focus_distance'])
+            else:
+                self.focus_distance_spin.setValue(0.0)  # Auto
+            
+            if camera_info.get('f_stop') is not None:
+                self.f_stop_spin.setValue(camera_info['f_stop'])
+            else:
+                self.f_stop_spin.setValue(0.0)  # Disabled
         
         self.camera_selected.emit(prim_path)
     
@@ -186,6 +223,19 @@ class CameraManagerWidget(QWidget):
         self.camera_manager.set_camera_property(
             self.current_camera_prim, 'projection', self.projection_combo.currentText()
         )
+        
+        # Update DOF properties (USD 25.11)
+        focus_distance = self.focus_distance_spin.value()
+        if focus_distance > 0:
+            self.camera_manager.set_camera_property(
+                self.current_camera_prim, 'focus_distance', focus_distance
+            )
+        
+        f_stop = self.f_stop_spin.value()
+        if f_stop > 0:
+            self.camera_manager.set_camera_property(
+                self.current_camera_prim, 'f_stop', f_stop
+            )
         
         self.camera_changed.emit(self.current_camera_prim.GetPath().pathString)
     

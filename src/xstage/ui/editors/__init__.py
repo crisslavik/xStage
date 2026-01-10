@@ -9,10 +9,14 @@ try:
     from .aov_visualization_ui import AOVVisualizationWidget
     from .camera_manager_ui import CameraManagerWidget
     from .collection_editor_ui import CollectionEditorWidget
+    from .light_linking_ui import LightLinkingWidget
+    from .light_manager_ui import LightManagerWidget
     from .converter_ui import ConverterDialog
     from .layer_composition_ui import LayerCompositionWidget
     from .material_editor_ui import MaterialEditorWidget
+    from .ocio_settings_ui import OCIOSettingsDialog
     from .openexec_ui import OpenExecWidget
+    from .preferences_ui import PreferencesDialog
     from .prim_selection_ui import PrimPropertiesWidget
     from .primvar_editor_ui import PrimvarEditorWidget
     from .render_settings_editor_ui import RenderSettingsEditorWidget
@@ -26,10 +30,14 @@ try:
         "AOVVisualizationWidget",
         "CameraManagerWidget",
         "CollectionEditorWidget",
+        "LightLinkingWidget",
+        "LightManagerWidget",
         "ConverterDialog",
         "LayerCompositionWidget",
         "MaterialEditorWidget",
+        "OCIOSettingsDialog",
         "OpenExecWidget",
+        "PreferencesDialog",
         "PrimPropertiesWidget",
         "PrimvarEditorWidget",
         "RenderSettingsEditorWidget",
