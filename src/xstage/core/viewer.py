@@ -1036,14 +1036,17 @@ class USDViewerWindow(QMainWindow):
         view_menu = menubar.addMenu("&View")
         
         # Recent Files submenu
-        recent_files_menu = view_menu.addMenu("&Recent Files")
+        self.recent_files_menu = view_menu.addMenu("&Recent Files")
         self.recent_files_actions = []
-        self.update_recent_files_menu()
         
         # Bookmarks submenu
-        bookmarks_menu = view_menu.addMenu("&Bookmarks")
+        self.bookmarks_menu = view_menu.addMenu("&Bookmarks")
         self.bookmarks_actions = []
-        self.update_bookmarks_menu()
+        
+        # Update menus after all menus are created
+        # (Delay to avoid Qt object lifecycle issues)
+        QTimer.singleShot(0, self.update_recent_files_menu)
+        QTimer.singleShot(0, self.update_bookmarks_menu)
         
         view_menu.addSeparator()
         
@@ -2212,24 +2215,11 @@ class USDViewerWindow(QMainWindow):
                 action.deleteLater()
         self.recent_files_actions.clear()
         
-        # Get recent files menu
-        recent_files_menu = None
-        view_menu = None
-        for action in self.menuBar().actions():
-            if action.menu() and "View" in action.menu().title():
-                view_menu = action.menu()
-                break
-        
-        if view_menu:
-            for action in view_menu.actions():
-                if action.menu() and "Recent Files" in action.menu().title():
-                    recent_files_menu = action.menu()
-                    break
-        
-        if not recent_files_menu:
+        # Use stored menu reference
+        if not hasattr(self, 'recent_files_menu') or not self.recent_files_menu:
             return
         
-        recent_files_menu.clear()
+        self.recent_files_menu.clear()
         
         # Add recent files
         recent_files = self.recent_files_manager.get_recent_files(limit=10)
@@ -2242,13 +2232,13 @@ class USDViewerWindow(QMainWindow):
             action = QAction(display_name, self)
             action.setData(recent_file.path)
             action.triggered.connect(lambda checked, path=recent_file.path: self.load_recent_file(path))
-            recent_files_menu.addAction(action)
+            self.recent_files_menu.addAction(action)
             self.recent_files_actions.append(action)
         
         if not recent_files:
             no_files_action = QAction("No recent files", self)
             no_files_action.setEnabled(False)
-            recent_files_menu.addAction(no_files_action)
+            self.recent_files_menu.addAction(no_files_action)
     
     def load_recent_file(self, filepath: str):
         """Load a recent file"""
@@ -2267,24 +2257,11 @@ class USDViewerWindow(QMainWindow):
                 action.deleteLater()
         self.bookmarks_actions.clear()
         
-        # Get bookmarks menu
-        bookmarks_menu = None
-        view_menu = None
-        for action in self.menuBar().actions():
-            if action.menu() and "View" in action.menu().title():
-                view_menu = action.menu()
-                break
-        
-        if view_menu:
-            for action in view_menu.actions():
-                if action.menu() and "Bookmarks" in action.menu().title():
-                    bookmarks_menu = action.menu()
-                    break
-        
-        if not bookmarks_menu:
+        # Use stored menu reference
+        if not hasattr(self, 'bookmarks_menu') or not self.bookmarks_menu:
             return
         
-        bookmarks_menu.clear()
+        self.bookmarks_menu.clear()
         
         # Add bookmarks for current stage
         if self.stage_manager and self.stage_manager.stage:
@@ -2295,13 +2272,13 @@ class USDViewerWindow(QMainWindow):
                 action = QAction(bookmark.name, self)
                 action.setData(bookmark.id)
                 action.triggered.connect(lambda checked, bm_id=bookmark.id: self.load_bookmark(bm_id))
-                bookmarks_menu.addAction(action)
+                self.bookmarks_menu.addAction(action)
                 self.bookmarks_actions.append(action)
         
         if not self.bookmarks_actions:
             no_bookmarks_action = QAction("No bookmarks", self)
             no_bookmarks_action.setEnabled(False)
-            bookmarks_menu.addAction(no_bookmarks_action)
+            self.bookmarks_menu.addAction(no_bookmarks_action)
     
     def load_bookmark(self, bookmark_id: str):
         """Load a bookmark"""
