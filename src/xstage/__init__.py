@@ -29,7 +29,6 @@ from .ui.editors import (
     AnnotationsWidget,
     CameraManagerWidget,
     CollectionEditorWidget,
-    ConverterDialog,
     LayerCompositionWidget,
     MaterialEditorWidget,
     OpenExecWidget,
@@ -40,6 +39,11 @@ from .ui.editors import (
     SceneSearchWidget,
     StageVariablesWidget,
 )
+# ConverterDialog is optional
+try:
+    from .ui.editors import ConverterDialog
+except ImportError:
+    ConverterDialog = None
 
 # Managers
 from .managers import (
@@ -70,8 +74,9 @@ except ImportError:
 from .converters import (
     USDConverter,
     ConversionOptions,
-    ConverterDialog as ConverterDialogClass,
 )
+# ConverterDialogClass is an alias for ConverterDialog
+ConverterDialogClass = ConverterDialog
 
 # Utils
 from .utils import (
@@ -133,6 +138,8 @@ if AxisOrientationWidget is not None:
     __all__.append("AxisOrientationWidget")
 if NamespaceEditor is not None:
     __all__.append("NamespaceEditor")
+if ConverterDialog is not None:
+    __all__.append("ConverterDialog")
 __all__.extend([
     # UI Editors
     "AnimationCurveEditorWidget",
@@ -140,7 +147,6 @@ __all__.extend([
     "AOVVisualizationWidget",
     "CameraManagerWidget",
     "CollectionEditorWidget",
-    "ConverterDialog",
     "LayerCompositionWidget",
     "MaterialEditorWidget",
     "OpenExecWidget",
