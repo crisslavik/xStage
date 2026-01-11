@@ -849,27 +849,65 @@ class ViewportWidget(QOpenGLWidget):
         glEnable(GL_LIGHTING)
         
     def draw_axis(self):
-        """Draw coordinate axis"""
+        """Draw coordinate axis in bottom-left corner of viewport"""
         glDisable(GL_LIGHTING)
         glLineWidth(2.0)
+        
+        # Save current matrices
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        
+        # Set up orthographic projection for 2D overlay
+        glOrtho(0, self.width(), 0, self.height(), -1, 1)
+        
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        
+        # Position in bottom-left corner (with padding)
+        axis_size = min(60, self.width() // 10, self.height() // 10)  # Smaller, responsive size
+        padding = 20
+        origin_x = padding
+        origin_y = padding
+        
+        # Draw axis lines (smaller)
         glBegin(GL_LINES)
         
-        # X axis - Red
+        # X axis - Red (right)
         glColor3f(1, 0, 0)
-        glVertex3f(0, 0, 0)
-        glVertex3f(2, 0, 0)
+        glVertex2f(origin_x, origin_y)
+        glVertex2f(origin_x + axis_size, origin_y)
         
-        # Y axis - Green
+        # Y axis - Green (up)
         glColor3f(0, 1, 0)
-        glVertex3f(0, 0, 0)
-        glVertex3f(0, 2, 0)
+        glVertex2f(origin_x, origin_y)
+        glVertex2f(origin_x, origin_y + axis_size)
         
-        # Z axis - Blue
+        # Z axis - Blue (diagonal, representing depth)
         glColor3f(0, 0, 1)
-        glVertex3f(0, 0, 0)
-        glVertex3f(0, 0, 2)
+        glVertex2f(origin_x, origin_y)
+        glVertex2f(origin_x + axis_size * 0.7, origin_y + axis_size * 0.7)
         
         glEnd()
+        
+        # Restore matrices
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+        
+        glLineWidth(1.0)
+        glEnable(GL_LIGHTING)(origin_x + axis_size * 0.7, origin_y + axis_size * 0.7)
+        
+        glEnd()
+        
+        # Restore matrices
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+        
         glLineWidth(1.0)
         glEnable(GL_LIGHTING)
         
@@ -1212,6 +1250,13 @@ class USDViewerWindow(QMainWindow):
         
         file_menu.addSeparator()
         
+        # Recent Files submenu (moved from View menu)
+        self.recent_files_menu = file_menu.addMenu("&Recent Files")
+        self.recent_files_actions = []
+        QTimer.singleShot(0, self.update_recent_files_menu)
+        
+        file_menu.addSeparator()
+        
         exit_action = QAction("E&xit", self)
         exit_action.setShortcut(QKeySequence.Quit)
         exit_action.triggered.connect(self.close)
@@ -1243,17 +1288,7 @@ class USDViewerWindow(QMainWindow):
         except: pass
         # #endregion
         
-        self.recent_files_menu = view_menu.addMenu("&Recent Files")
-        self.recent_files_actions = []
-        
-        # #region agent log
-        try:
-            with open(str(log_path), "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "viewer.py:1085", "message": "recent_files_menu created", "data": {"recent_files_menu_valid": self.recent_files_menu is not None, "view_menu_valid": view_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-        except: pass
-        # #endregion
-        
-        # Bookmarks submenu
+        # Bookmarks submenu (Recent Files moved to File menu)
         # #region agent log
         try:
             with open(str(log_path), "a") as f:
@@ -1302,7 +1337,6 @@ class USDViewerWindow(QMainWindow):
         
         # Update menus after all menus are created
         # (Delay to avoid Qt object lifecycle issues)
-        QTimer.singleShot(0, self.update_recent_files_menu)
         QTimer.singleShot(0, self.update_bookmarks_menu)
         
         view_menu.addSeparator()
@@ -1551,55 +1585,115 @@ class USDViewerWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
         
     def create_playback_dock(self):
-        """Create playback controls dock"""
+        """Create playback controls dock with improved UI (Xstudio-style)"""
         dock = QDockWidget("Playback", self)
         playback_widget = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
         
-        # Timeline slider
-        timeline_layout = QHBoxLayout()
+        # Frame display and time info (top row)
+        info_layout = QHBoxLayout()
+        self.frame_label = QLabel("Frame: 0")
+        self.frame_label.setStyleSheet("font-weight: bold; font-size: 12pt; padding: 4px;")
+        info_layout.addWidget(self.frame_label)
+        
+        self.time_label = QLabel("Time: 0.00s")
+        self.time_label.setStyleSheet("color: #888; padding: 4px;")
+        info_layout.addWidget(self.time_label)
+        info_layout.addStretch()
+        layout.addLayout(info_layout)
+        
+        # Timeline slider (main control)
+        timeline_layout = QVBoxLayout()
+        timeline_layout.setSpacing(4)
+        
+        slider_label = QLabel("Timeline")
+        slider_label.setStyleSheet("font-size: 9pt; color: #666;")
+        timeline_layout.addWidget(slider_label)
+        
         self.timeline_slider = QSlider(Qt.Orientation.Horizontal)
         self.timeline_slider.valueChanged.connect(self.on_timeline_changed)
-        self.frame_label = QLabel("Frame: 0")
+        self.timeline_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #999;
+                height: 6px;
+                background: #333;
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: #4CAF50;
+                border: 1px solid #2E7D32;
+                width: 16px;
+                margin: -4px 0;
+                border-radius: 8px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #66BB6A;
+            }
+        """)
         timeline_layout.addWidget(self.timeline_slider)
-        timeline_layout.addWidget(self.frame_label)
         layout.addLayout(timeline_layout)
         
-        # Playback buttons
+        # Playback buttons (styled like Xstudio)
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(6)
         
-        self.play_button = QPushButton("Play")
-        self.play_button.clicked.connect(self.toggle_playback)
-        button_layout.addWidget(self.play_button)
-        
-        first_frame_btn = QPushButton("|<")
+        first_frame_btn = QPushButton("⏮")
+        first_frame_btn.setToolTip("First Frame")
+        first_frame_btn.setFixedSize(32, 32)
         first_frame_btn.clicked.connect(self.goto_first_frame)
+        first_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
         button_layout.addWidget(first_frame_btn)
         
-        prev_frame_btn = QPushButton("<")
+        prev_frame_btn = QPushButton("◀")
+        prev_frame_btn.setToolTip("Previous Frame")
+        prev_frame_btn.setFixedSize(32, 32)
         prev_frame_btn.clicked.connect(self.prev_frame)
+        prev_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
         button_layout.addWidget(prev_frame_btn)
         
-        next_frame_btn = QPushButton(">")
+        self.play_button = QPushButton("▶")
+        self.play_button.setToolTip("Play/Pause")
+        self.play_button.setFixedSize(40, 32)
+        self.play_button.clicked.connect(self.toggle_playback)
+        self.play_button.setStyleSheet("QPushButton { font-size: 16pt; font-weight: bold; }")
+        button_layout.addWidget(self.play_button)
+        
+        next_frame_btn = QPushButton("▶")
+        next_frame_btn.setToolTip("Next Frame")
+        next_frame_btn.setFixedSize(32, 32)
         next_frame_btn.clicked.connect(self.next_frame)
+        next_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
         button_layout.addWidget(next_frame_btn)
         
-        last_frame_btn = QPushButton(">|")
+        last_frame_btn = QPushButton("⏭")
+        last_frame_btn.setToolTip("Last Frame")
+        last_frame_btn.setFixedSize(32, 32)
         last_frame_btn.clicked.connect(self.goto_last_frame)
+        last_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
         button_layout.addWidget(last_frame_btn)
         
+        button_layout.addStretch()
         layout.addLayout(button_layout)
         
-        # FPS control
-        fps_layout = QHBoxLayout()
-        fps_layout.addWidget(QLabel("FPS:"))
+        # FPS and range controls (bottom row)
+        controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(10)
+        
+        fps_label = QLabel("FPS:")
+        fps_label.setStyleSheet("color: #888;")
+        controls_layout.addWidget(fps_label)
+        
         self.fps_spinbox = QSpinBox()
         self.fps_spinbox.setRange(1, 120)
         self.fps_spinbox.setValue(24)
+        self.fps_spinbox.setFixedWidth(60)
         self.fps_spinbox.valueChanged.connect(self.on_fps_changed)
-        fps_layout.addWidget(self.fps_spinbox)
-        fps_layout.addStretch()
-        layout.addLayout(fps_layout)
+        controls_layout.addWidget(self.fps_spinbox)
+        
+        controls_layout.addStretch()
+        layout.addLayout(controls_layout)
         
         playback_widget.setLayout(layout)
         dock.setWidget(playback_widget)
@@ -1948,12 +2042,14 @@ class USDViewerWindow(QMainWindow):
         self.is_playing = not self.is_playing
         
         if self.is_playing:
-            self.play_button.setText("Pause")
+            self.play_button.setText("⏸")
+            self.play_button.setToolTip("Pause")
             fps = self.fps_spinbox.value()
             interval = int(1000.0 / fps)
             self.playback_timer.start(interval)
         else:
-            self.play_button.setText("Play")
+            self.play_button.setText("▶")
+            self.play_button.setToolTip("Play")
             self.playback_timer.stop()
             
     def advance_frame(self):
@@ -1971,10 +2067,25 @@ class USDViewerWindow(QMainWindow):
     def on_timeline_changed(self, value):
         """Handle timeline slider change"""
         self.frame_label.setText(f"Frame: {value}")
+        
+        # Update time label if it exists
+        if hasattr(self, 'time_label'):
+            fps = self.stage_manager.fps if self.stage_manager.fps > 0 else 24.0
+            time_seconds = value / fps
+            self.time_label.setText(f"Time: {time_seconds:.2f}s")
+        
         if self.use_hydra and self.hydra_viewport:
-            self.hydra_viewport.update_geometry(float(value))
+            try:
+                self.hydra_viewport.update_geometry(float(value))
+            except RuntimeError:
+                pass
         else:
-            self.viewport.update_geometry(float(value))
+            if self.viewport:
+                try:
+                    self.viewport.update_geometry(float(value))
+                    self.viewport.update()
+                except RuntimeError:
+                    pass
         
     def on_fps_changed(self, fps):
         """Handle FPS change"""
@@ -2092,6 +2203,10 @@ class USDViewerWindow(QMainWindow):
             self.layer_composition_widget = LayerCompositionWidget()
             dock = QDockWidget("Layer Composition", self)
             dock.setWidget(self.layer_composition_widget)
+            # Apply theme to dock widget for color consistency
+            dock.setPalette(self.palette())
+            if dock.widget():
+                dock.widget().setPalette(self.palette())
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
             if self.stage_manager.stage:
                 self.layer_composition_widget.set_stage(self.stage_manager.stage)
@@ -2110,6 +2225,9 @@ class USDViewerWindow(QMainWindow):
             self.animation_editor_widget = AnimationCurveEditorWidget()
             dock = QDockWidget("Animation Curve Editor", self)
             dock.setWidget(self.animation_editor_widget)
+            dock.setPalette(self.palette())
+            if dock.widget():
+                dock.widget().setPalette(self.palette())
             self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
             if self.stage_manager.stage:
                 self.animation_editor_widget.set_stage(self.stage_manager.stage)
@@ -2630,6 +2748,28 @@ class USDViewerWindow(QMainWindow):
             self.viewport.settings.background_color = (
                 bg_color.redF(), bg_color.greenF(), bg_color.blueF(), 1.0
             )
+        
+        # Apply theme to all dock widgets to fix color consistency
+        self.apply_theme_to_docks()
+    
+    def apply_theme_to_docks(self):
+        """Apply current theme to all dock widgets for color consistency"""
+        palette = self.palette()
+        for dock in self.findChildren(QDockWidget):
+            dock.setPalette(palette)
+            # Also apply to the widget inside the dock
+            if dock.widget():
+                dock.widget().setPalette(palette)
+    
+    def _create_dock_with_theme(self, title: str, widget: QWidget, area: Qt.DockWidgetArea) -> QDockWidget:
+        """Helper to create dock widget with theme applied"""
+        dock = QDockWidget(title, self)
+        dock.setWidget(widget)
+        dock.setPalette(self.palette())
+        if widget:
+            widget.setPalette(self.palette())
+        self.addDockWidget(area, dock)
+        return dock
             self.viewport.update()
     
     def toggle_viewport_overlay(self, checked: bool):
