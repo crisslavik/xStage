@@ -1046,20 +1046,32 @@ class USDViewerWindow(QMainWindow):
         
         # Create central widget with viewport
         # Try to use Hydra viewport if available, fallback to OpenGL
+        self.hydra_viewport = None
+        self.viewport = ViewportWidget()
+        self.viewport.set_stage_manager(self.stage_manager)
+        
         try:
             from ..rendering.hydra_viewport import HydraViewportWidget
-            self.hydra_viewport = HydraViewportWidget()
-            self.hydra_viewport.set_stage_manager(self.stage_manager)
-            self.viewport = ViewportWidget()  # Keep as fallback
-            self.viewport.set_stage_manager(self.stage_manager)
-            # Start with Hydra viewport if available (better rendering)
-            self.setCentralWidget(self.hydra_viewport)
-            self.use_hydra = True
-        except ImportError:
-            self.viewport = ViewportWidget()
-            self.viewport.set_stage_manager(self.stage_manager)
-            self.setCentralWidget(self.viewport)
+            # Check if UsdImagingGL is actually available
+            try:
+                from pxr import UsdImagingGL
+                # UsdImagingGL is available, create Hydra viewport
+                self.hydra_viewport = HydraViewportWidget()
+                self.hydra_viewport.set_stage_manager(self.stage_manager)
+                # Start with Hydra viewport (better rendering)
+                self.setCentralWidget(self.hydra_viewport)
+                self.use_hydra = True
+                self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
+            except ImportError:
+                # UsdImagingGL not available, use OpenGL fallback
+                self.hydra_viewport = None
+                self.setCentralWidget(self.viewport)
+                self.use_hydra = False
+        except (ImportError, Exception) as e:
+            # Hydra viewport class not available or failed to create
             self.hydra_viewport = None
+            self.setCentralWidget(self.viewport)
+            self.use_hydra = False
         
         # Add viewport overlay (will be shown after viewport is visible)
         from ..utils.viewport_overlay import ViewportOverlay
