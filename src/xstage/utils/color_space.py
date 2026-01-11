@@ -10,8 +10,15 @@ from pxr import Usd, UsdLux
 try:
     from pxr import Usd, UsdLux
     USD_AVAILABLE = True
+    # Check if ColorSpaceAPI is available
+    try:
+        _ = UsdLux.ColorSpaceAPI
+        USDLUX_COLORSPACEAPI_AVAILABLE = True
+    except AttributeError:
+        USDLUX_COLORSPACEAPI_AVAILABLE = False
 except ImportError:
     USD_AVAILABLE = False
+    USDLUX_COLORSPACEAPI_AVAILABLE = False
 
 
 class ColorSpaceManager:
@@ -24,6 +31,8 @@ class ColorSpaceManager:
             return None
         
         try:
+            if not USDLUX_COLORSPACEAPI_AVAILABLE:
+                return None
             color_space_api = UsdLux.ColorSpaceAPI(prim)
             if not color_space_api:
                 return None
@@ -54,6 +63,8 @@ class ColorSpaceManager:
             return False
         
         try:
+            if not USDLUX_COLORSPACEAPI_AVAILABLE:
+                return False
             color_space_api = UsdLux.ColorSpaceAPI.Apply(prim)
             if color_space_api:
                 color_space_api.CreateColorSpaceAttr().Set(color_space)
@@ -71,6 +82,8 @@ class ColorSpaceManager:
             return None
         
         try:
+            if not USDLUX_COLORSPACEAPI_AVAILABLE:
+                return None
             root_prim = stage.GetPseudoRoot()
             color_space_api = UsdLux.ColorSpaceAPI(root_prim)
             if color_space_api and color_space_api.GetColorSpaceAttr():

@@ -27,6 +27,21 @@ from OpenGL.GLU import *
 try:
     from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, Kind, UsdLux, UsdRender, UsdSkel, UsdUtils
     USD_AVAILABLE = True
+    
+    # Check if UsdLux.LightAPI exists (it's the correct way to check for lights)
+    try:
+        _ = UsdLux.LightAPI
+        USDLUX_LIGHTAPI_AVAILABLE = True
+    except AttributeError:
+        USDLUX_LIGHTAPI_AVAILABLE = False
+    
+    # Check if UsdLux.ColorSpaceAPI exists
+    try:
+        _ = UsdLux.ColorSpaceAPI
+        USDLUX_COLORSPACEAPI_AVAILABLE = True
+    except AttributeError:
+        USDLUX_COLORSPACEAPI_AVAILABLE = False
+    
     # Try to import UsdCollectionAPI separately as it may not be available in all USD versions
     try:
         from pxr import UsdCollectionAPI
@@ -44,6 +59,8 @@ except ImportError:
     print("Warning: USD Python bindings not found. Install with: pip install usd-core")
     
     # Create dummy classes for type hints
+    USDLUX_LIGHTAPI_AVAILABLE = False
+    USDLUX_COLORSPACEAPI_AVAILABLE = False
     class UsdLux:
         pass
     class UsdCollectionAPI:
@@ -95,6 +112,35 @@ class ViewerSettings:
     camera_fov: float = 60.0
     near_clip: float = 0.1
     far_clip: float = 10000.0
+
+
+def _is_light_prim(prim) -> bool:
+    """Check if a prim is a light (safe for all USD versions)"""
+    if not USD_AVAILABLE or not prim:
+        return False
+    
+    try:
+        # Try LightAPI first (most common)
+        if USDLUX_LIGHTAPI_AVAILABLE:
+            if prim.IsA(UsdLux.LightAPI):
+                return True
+        
+        # Check for specific light types
+        light_types = [
+            'DistantLight', 'SphereLight', 'RectLight', 'DiskLight',
+            'CylinderLight', 'DomeLight', 'PortalLight', 'GeometryLight'
+        ]
+        for light_type in light_types:
+            try:
+                light_class = getattr(UsdLux, light_type, None)
+                if light_class and prim.IsA(light_class):
+                    return True
+            except (AttributeError, TypeError):
+                continue
+        
+        return False
+    except Exception:
+        return False
 
 
 class USDStageManager:
@@ -161,7 +207,7 @@ class USDStageManager:
                 if cam_data:
                     geometry_data['cameras'].append(cam_data)
                     
-            elif USD_AVAILABLE and prim.IsA(UsdLux.Light):
+            elif _is_light_prim(prim):
                 # Use modern UsdLux instead of deprecated UsdGeom.Light
                 if UsdLuxExtractor:
                     light_data = UsdLuxExtractor.extract_light(prim, time_code)
@@ -269,7 +315,7 @@ class USDStageManager:
     def _extract_light(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
         """Extract light data - DEPRECATED: Use UsdLuxExtractor instead"""
         # This method is kept for backward compatibility but should use UsdLuxExtractor
-        if USD_AVAILABLE and prim.IsA(UsdLux.Light):
+        if _is_light_prim(prim):
             if UsdLuxExtractor:
                 return UsdLuxExtractor.extract_light(prim, time_code)
             else:
@@ -1673,7 +1719,7 @@ class USDViewerWindow(QMainWindow):
                 type_indicators.append("📦")
             elif prim.IsA(UsdGeom.Camera):
                 type_indicators.append("📷")
-            elif USD_AVAILABLE and prim.IsA(UsdLux.Light):
+            elif _is_light_prim(prim):
                 type_indicators.append("💡")
             elif USD_AVAILABLE and prim.IsA(UsdShade.Material):
                 type_indicators.append("🎨")
@@ -2157,7 +2203,7 @@ class USDViewerWindow(QMainWindow):
                 return
             
             # Check if it's a light
-            if not light_prim.IsA(UsdLux.Light):
+            if not _is_light_prim(light_prim):
                 QMessageBox.warning(
                     self,
                     "Invalid Light",

@@ -134,6 +134,9 @@ class OCIOManager:
             return None
         
         try:
+            # Check if ColorSpaceAPI is available
+            if not hasattr(UsdLux, 'ColorSpaceAPI'):
+                return None
             color_space_api = UsdLux.ColorSpaceAPI(prim)
             if not color_space_api:
                 return None
