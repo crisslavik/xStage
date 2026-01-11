@@ -2773,6 +2773,14 @@ class USDViewerWindow(QMainWindow):
         
         # Apply theme to all dock widgets to fix color consistency
         self.apply_theme_to_docks()
+        
+        # Apply theme to menu bar
+        menubar = self.menuBar()
+        if menubar:
+            menubar.setPalette(palette)
+            # Apply to all menus
+            for menu in menubar.findChildren(QMenu):
+                menu.setPalette(palette)
     
     def apply_theme_to_docks(self):
         """Apply current theme to all dock widgets for color consistency"""
