@@ -57,7 +57,16 @@ class OCIOManager:
         self.config_path = config_path
         
         if not self.ocio_available:
-            print("Warning: PyOpenColorIO not available. Install with: pip install PyOpenColorIO")
+            # Check if we're in the xStage virtual environment
+            import sys
+            venv_path = ".xstage_venv"
+            if venv_path not in sys.executable:
+                print("Warning: PyOpenColorIO not available.", file=sys.stderr)
+                print("Note: You're not using the xStage virtual environment.", file=sys.stderr)
+                print("To use PyOpenColorIO, run xStage using: ./launch_usd_viewer.sh", file=sys.stderr)
+                print("Or activate the virtual environment: source .xstage_venv/bin/activate", file=sys.stderr)
+            else:
+                print("Warning: PyOpenColorIO not available. Install with: pip install PyOpenColorIO", file=sys.stderr)
             return
         
         # Load OCIO config
