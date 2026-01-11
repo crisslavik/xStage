@@ -8,6 +8,7 @@ import numpy as np
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, 
                              QDoubleSpinBox, QGroupBox, QPushButton)
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -31,6 +32,13 @@ class ViewportWidget(QOpenGLWidget):
     scale_changed = Signal(float)
     
     def __init__(self, parent=None):
+        # Configure OpenGL format for compatibility profile (supports deprecated functions)
+        fmt = QSurfaceFormat()
+        fmt.setVersion(2, 1)  # OpenGL 2.1
+        fmt.setProfile(QSurfaceFormat.CompatibilityProfile)  # Compatibility profile (not Core)
+        fmt.setSamples(4)  # 4x MSAA
+        QSurfaceFormat.setDefaultFormat(fmt)
+        
         super().__init__(parent)
         self.stage_manager = None
         self.geometry_data = {}
