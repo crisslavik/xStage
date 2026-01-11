@@ -898,17 +898,6 @@ class ViewportWidget(QOpenGLWidget):
         glMatrixMode(GL_MODELVIEW)
         
         glLineWidth(1.0)
-        glEnable(GL_LIGHTING)(origin_x + axis_size * 0.7, origin_y + axis_size * 0.7)
-        
-        glEnd()
-        
-        # Restore matrices
-        glPopMatrix()
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
-        glMatrixMode(GL_MODELVIEW)
-        
-        glLineWidth(1.0)
         glEnable(GL_LIGHTING)
         
     def draw_geometry(self):
