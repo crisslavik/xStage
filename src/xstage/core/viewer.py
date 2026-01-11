@@ -916,15 +916,31 @@ class ViewportWidget(QOpenGLWidget):
         if not self.geometry_data or 'meshes' not in self.geometry_data:
             return
         
+        if not self.geometry_data['meshes']:
+            # No meshes to draw
+            return
+        
         glEnable(GL_LIGHTING)
+        glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LEQUAL)
+        glEnable(GL_NORMALIZE)  # Normalize normals for proper lighting
+        
         # Brighter material properties for better visibility
         glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, [0.4, 0.4, 0.4, 1.0])  # Brighter ambient
         glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [0.9, 0.9, 0.9, 1.0])  # Brighter diffuse
         glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.5, 0.5, 0.5, 1.0])  # Brighter specular
         glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 64.0)
         
+        # Enable color material for better visibility
+        glEnable(GL_COLOR_MATERIAL)
+        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+        glColor3f(0.8, 0.8, 0.8)  # Default gray color
+        
         for mesh in self.geometry_data['meshes']:
-            self.draw_mesh(mesh)
+            if mesh and 'points' in mesh and len(mesh['points']) > 0:
+                self.draw_mesh(mesh)
+        
+        glDisable(GL_COLOR_MATERIAL)
     
     def draw_mesh(self, mesh: Dict):
         """Draw a single mesh"""
@@ -1582,6 +1598,9 @@ class USDViewerWindow(QMainWindow):
         layout.addStretch()
         info_widget.setLayout(layout)
         dock.setWidget(info_widget)
+        dock.setPalette(self.palette())
+        if dock.widget():
+            dock.widget().setPalette(self.palette())
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
         
     def create_playback_dock(self):
@@ -2246,6 +2265,9 @@ class USDViewerWindow(QMainWindow):
             self.material_editor_widget = MaterialEditorWidget()
             dock = QDockWidget("Material Editor", self)
             dock.setWidget(self.material_editor_widget)
+            dock.setPalette(self.palette())
+            if dock.widget():
+                dock.widget().setPalette(self.palette())
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
             if self.stage_manager.stage:
                 self.material_editor_widget.set_stage(self.stage_manager.stage)
