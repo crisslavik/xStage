@@ -1063,13 +1063,15 @@ class USDViewerWindow(QMainWindow):
         
         # Add viewport overlay (will be shown after viewport is visible)
         from ..utils.viewport_overlay import ViewportOverlay
-        self.viewport_overlay = ViewportOverlay(self.viewport)
-        self.viewport_overlay.setParent(self.viewport)
+        # Use the active viewport (Hydra if available, otherwise OpenGL)
+        active_viewport = self.hydra_viewport if (hasattr(self, 'hydra_viewport') and self.hydra_viewport) else self.viewport
+        self.viewport_overlay = ViewportOverlay(active_viewport)
+        self.viewport_overlay.setParent(active_viewport)
         self.viewport_overlay.raise_()
         self.viewport_overlay.show()
         
         # Store overlay reference in viewport for resize handling
-        self.viewport.overlay = self.viewport_overlay
+        active_viewport.overlay = self.viewport_overlay
         
         # Create menus
         self.create_menus()
