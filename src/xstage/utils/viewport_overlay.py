@@ -104,7 +104,7 @@ class ViewportOverlay(QWidget):
         self.update()
     
     def paintEvent(self, event):
-        """Paint overlay information"""
+        """Paint overlay information in a box like Blender"""
         painter = QPainter(self)
         try:
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -114,15 +114,63 @@ class ViewportOverlay(QWidget):
             font.setBold(True)
             painter.setFont(font)
             
-            # Background color (semi-transparent)
-            bg_color = QColor(0, 0, 0, 180)
+            # Background color (semi-transparent dark box)
+            bg_color = QColor(0, 0, 0, 200)
             text_color = QColor(255, 255, 255, 255)
             highlight_color = QColor(100, 150, 255, 255)
+            border_color = QColor(100, 100, 100, 255)
             
-            y_offset = 10
-            x_offset = 10
+            # Calculate content size first
+            content_lines = []
+            if self.show_fps:
+                content_lines.append(f"FPS: {self.fps:.1f}")
+            if self.show_stats and self.stats:
+                for key, value in list(self.stats.items())[:5]:
+                    content_lines.append(f"{key}: {value}")
+            if self.show_memory and self.memory_usage > 0:
+                content_lines.append(f"Memory: {self.memory_usage:.1f} MB")
+            if self.show_selection and self.selected_prim:
+                sel_text = f"Selected: {self.selected_prim[:40]}"
+                if len(self.selected_prim) > 40:
+                    sel_text += "..."
+                content_lines.append(sel_text)
+            if self.show_camera and self.camera_info:
+                cam_text = f"Camera: {self.camera_info.get('name', 'N/A')}"
+                if 'fov' in self.camera_info:
+                    cam_text += f" | FOV: {self.camera_info['fov']:.1f}°"
+                content_lines.append(cam_text)
+            if self.color_space_info and self.color_space_info.get('ocio_available', False):
+                asset_cs = self.color_space_info.get('asset_color_space', 'Unknown')
+                display_cs = self.color_space_info.get('display_color_space', 'Unknown')
+                content_lines.append(f"Color Space: {asset_cs} → {display_cs}")
+            
+            if not content_lines:
+                return  # Nothing to draw
+            
+            # Calculate box dimensions
             line_height = 18
-            padding = 5
+            padding = 10
+            spacing = 4
+            max_width = 0
+            for line in content_lines:
+                text_rect = painter.fontMetrics().boundingRect(line)
+                max_width = max(max_width, text_rect.width())
+            
+            box_width = max_width + padding * 2
+            box_height = len(content_lines) * (line_height + spacing) + padding * 2 - spacing
+            
+            # Position in top-left corner
+            x_offset = 10
+            y_offset = 10
+            
+            # Draw background box with border
+            box_rect = QRect(x_offset, y_offset, box_width, box_height)
+            painter.fillRect(box_rect, bg_color)
+            painter.setPen(QPen(border_color, 1))
+            painter.drawRect(box_rect)
+            
+            # Draw text inside box
+            y_pos = y_offset + padding + line_height
             
             # Draw FPS
             if self.show_fps:

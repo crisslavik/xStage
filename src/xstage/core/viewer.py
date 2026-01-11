@@ -849,53 +849,53 @@ class ViewportWidget(QOpenGLWidget):
         glEnable(GL_LIGHTING)
         
     def draw_axis(self):
-        """Draw coordinate axis in bottom-left corner of viewport"""
+        """Draw 3D coordinate axis that rotates with the view (like Blender/Maya)"""
         glDisable(GL_LIGHTING)
-        glLineWidth(2.0)
+        glLineWidth(3.0)
         
-        # Save current matrices
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
+        # Position in bottom-left corner of viewport (in 3D space, not 2D overlay)
+        # Calculate screen-space position
+        axis_size = 1.0  # Size in world units
+        padding = 0.5  # Offset from corner
         
-        # Set up orthographic projection for 2D overlay
-        glOrtho(0, self.width(), 0, self.height(), -1, 1)
+        # Get current viewport dimensions for positioning
+        # We'll position it in world space at the bottom-left of the visible area
+        # Calculate a position that's always visible in the bottom-left
         
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
+        # Get camera position and direction
+        cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+        cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+        cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+        camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
         
-        # Position in bottom-left corner (with padding)
-        axis_size = min(60, self.width() // 10, self.height() // 10)  # Smaller, responsive size
-        padding = 20
-        origin_x = padding
-        origin_y = padding
+        # Calculate axis origin in world space (bottom-left of view)
+        # Use camera target as reference, offset to bottom-left
+        view_right = np.array([1, 0, 0])  # Will be transformed by view
+        view_up = np.array([0, 1, 0])
+        view_forward = np.array([0, 0, 1])
         
-        # Draw axis lines (smaller)
+        # Position axis at camera target with offset
+        axis_origin = self.camera_target.copy()
+        
+        # Draw axis lines in 3D space (will rotate with view)
         glBegin(GL_LINES)
         
         # X axis - Red (right)
         glColor3f(1, 0, 0)
-        glVertex2f(origin_x, origin_y)
-        glVertex2f(origin_x + axis_size, origin_y)
+        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2])
+        glVertex3f(axis_origin[0] + axis_size, axis_origin[1], axis_origin[2])
         
         # Y axis - Green (up)
         glColor3f(0, 1, 0)
-        glVertex2f(origin_x, origin_y)
-        glVertex2f(origin_x, origin_y + axis_size)
+        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2])
+        glVertex3f(axis_origin[0], axis_origin[1] + axis_size, axis_origin[2])
         
-        # Z axis - Blue (diagonal, representing depth)
+        # Z axis - Blue (forward)
         glColor3f(0, 0, 1)
-        glVertex2f(origin_x, origin_y)
-        glVertex2f(origin_x + axis_size * 0.7, origin_y + axis_size * 0.7)
+        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2])
+        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2] + axis_size)
         
         glEnd()
-        
-        # Restore matrices
-        glPopMatrix()
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
-        glMatrixMode(GL_MODELVIEW)
         
         glLineWidth(1.0)
         glEnable(GL_LIGHTING)
@@ -1606,40 +1606,57 @@ class USDViewerWindow(QMainWindow):
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center align
         
-        # Playback buttons
+        # Playback buttons - styled to match UI theme
+        button_style = """
+            QPushButton {
+                background-color: palette(button);
+                color: palette(button-text);
+                border: 1px solid palette(mid);
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QPushButton:hover {
+                background-color: palette(button);
+                border: 1px solid palette(highlight);
+            }
+            QPushButton:pressed {
+                background-color: palette(dark);
+            }
+        """
+        
         first_frame_btn = QPushButton("⏮")
         first_frame_btn.setToolTip("First Frame")
         first_frame_btn.setFixedSize(32, 32)
         first_frame_btn.clicked.connect(self.goto_first_frame)
-        first_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        first_frame_btn.setStyleSheet(button_style + "QPushButton { font-size: 14pt; }")
         layout.addWidget(first_frame_btn)
         
         prev_frame_btn = QPushButton("◀")
         prev_frame_btn.setToolTip("Previous Frame")
         prev_frame_btn.setFixedSize(32, 32)
         prev_frame_btn.clicked.connect(self.prev_frame)
-        prev_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        prev_frame_btn.setStyleSheet(button_style + "QPushButton { font-size: 14pt; }")
         layout.addWidget(prev_frame_btn)
         
         self.play_button = QPushButton("▶")
         self.play_button.setToolTip("Play/Pause")
         self.play_button.setFixedSize(40, 32)
         self.play_button.clicked.connect(self.toggle_playback)
-        self.play_button.setStyleSheet("QPushButton { font-size: 16pt; font-weight: bold; }")
+        self.play_button.setStyleSheet(button_style + "QPushButton { font-size: 16pt; font-weight: bold; }")
         layout.addWidget(self.play_button)
         
         next_frame_btn = QPushButton("▶")
         next_frame_btn.setToolTip("Next Frame")
         next_frame_btn.setFixedSize(32, 32)
         next_frame_btn.clicked.connect(self.next_frame)
-        next_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        next_frame_btn.setStyleSheet(button_style + "QPushButton { font-size: 14pt; }")
         layout.addWidget(next_frame_btn)
         
         last_frame_btn = QPushButton("⏭")
         last_frame_btn.setToolTip("Last Frame")
         last_frame_btn.setFixedSize(32, 32)
         last_frame_btn.clicked.connect(self.goto_last_frame)
-        last_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        last_frame_btn.setStyleSheet(button_style + "QPushButton { font-size: 14pt; }")
         layout.addWidget(last_frame_btn)
         
         layout.addSpacing(20)  # Spacer between buttons and timeline
@@ -1670,13 +1687,13 @@ class USDViewerWindow(QMainWindow):
         
         layout.addSpacing(20)  # Spacer between timeline and info
         
-        # Frame and time display
+        # Frame and time display - bright text
         self.frame_label = QLabel("Frame: 0")
-        self.frame_label.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 4px;")
+        self.frame_label.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 4px; color: palette(window-text);")
         layout.addWidget(self.frame_label)
         
         self.time_label = QLabel("Time: 0.00s")
-        self.time_label.setStyleSheet("color: #888; font-size: 10pt; padding: 4px;")
+        self.time_label.setStyleSheet("font-weight: bold; font-size: 10pt; padding: 4px; color: palette(window-text);")
         layout.addWidget(self.time_label)
         
         layout.addSpacing(20)  # Spacer between info and FPS
