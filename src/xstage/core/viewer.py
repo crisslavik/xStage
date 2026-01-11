@@ -208,6 +208,14 @@ class USDStageManager:
         
         # Traverse stage and collect renderable geometry
         for prim in self.stage.Traverse():
+            # Check visibility - skip invisible prims
+            if USD_AVAILABLE:
+                imageable = UsdGeom.Imageable(prim)
+                if imageable:
+                    visibility = imageable.ComputeVisibility(time_code)
+                    if visibility == UsdGeom.Tokens.invisible:
+                        continue  # Skip invisible prims
+            
             if prim.IsA(UsdGeom.Mesh):
                 mesh_data = self._extract_mesh(prim, time_code)
                 if mesh_data:
@@ -839,10 +847,11 @@ class ViewportWidget(QOpenGLWidget):
             return
         
         glEnable(GL_LIGHTING)
-        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
-        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
-        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.3, 0.3, 0.3, 1.0])
-        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0)
+        # Brighter material properties for better visibility
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, [0.4, 0.4, 0.4, 1.0])  # Brighter ambient
+        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [0.9, 0.9, 0.9, 1.0])  # Brighter diffuse
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.5, 0.5, 0.5, 1.0])  # Brighter specular
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 64.0)
         
         for mesh in self.geometry_data['meshes']:
             self.draw_mesh(mesh)
@@ -1043,8 +1052,9 @@ class USDViewerWindow(QMainWindow):
             self.hydra_viewport.set_stage_manager(self.stage_manager)
             self.viewport = ViewportWidget()  # Keep as fallback
             self.viewport.set_stage_manager(self.stage_manager)
-            # Start with OpenGL viewport
-            self.setCentralWidget(self.viewport)
+            # Start with Hydra viewport if available (better rendering)
+            self.setCentralWidget(self.hydra_viewport)
+            self.use_hydra = True
         except ImportError:
             self.viewport = ViewportWidget()
             self.viewport.set_stage_manager(self.stage_manager)
@@ -1391,6 +1401,7 @@ class USDViewerWindow(QMainWindow):
         self.hierarchy_tree = QTreeWidget()
         self.hierarchy_tree.setHeaderLabel("Prims")
         self.hierarchy_tree.itemDoubleClicked.connect(self.on_hierarchy_item_double_clicked)
+        self.hierarchy_tree.itemChanged.connect(self.on_hierarchy_item_changed)
         dock.setWidget(self.hierarchy_tree)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         
@@ -1791,6 +1802,20 @@ class USDViewerWindow(QMainWindow):
             item = QTreeWidgetItem([display_name])
             item.setData(0, Qt.ItemDataRole.UserRole, prim.GetPath().pathString)
             
+            # Check visibility and set checkbox
+            if USD_AVAILABLE:
+                imageable = UsdGeom.Imageable(prim)
+                if imageable:
+                    visibility_attr = imageable.GetVisibilityAttr()
+                    if visibility_attr:
+                        visibility = visibility_attr.Get()
+                        # Set checkbox state: checked = visible, unchecked = invisible
+                        item.setCheckState(0, Qt.CheckState.Checked if visibility != UsdGeom.Tokens.invisible else Qt.CheckState.Unchecked)
+                    else:
+                        item.setCheckState(0, Qt.CheckState.Checked)  # Default to visible
+                else:
+                    item.setCheckState(0, Qt.CheckState.Checked)  # Default to visible
+            
             # Store prim info in item
             item.setToolTip(0, f"Type: {prim.GetTypeName()}\nPath: {prim.GetPath()}")
             
@@ -1901,9 +1926,15 @@ class USDViewerWindow(QMainWindow):
         
     def frame_all(self):
         """Frame all geometry in view"""
-        if self.viewport.geometry_data and 'bounds' in self.viewport.geometry_data:
-            self.viewport.frame_bounds(self.viewport.geometry_data['bounds'])
-            self.viewport.update()
+        if not self.viewport:
+            return
+        try:
+            if self.viewport.geometry_data and 'bounds' in self.viewport.geometry_data:
+                self.viewport.frame_bounds(self.viewport.geometry_data['bounds'])
+                self.viewport.update()
+        except RuntimeError:
+            # Widget was deleted, ignore
+            pass
     
     def validate_stage(self):
         """Validate the current USD stage"""
@@ -2062,17 +2093,28 @@ class USDViewerWindow(QMainWindow):
         
         if checked:
             # Switch to Hydra
-            self.hydra_viewport.set_stage(self.stage_manager.stage)
-            if self.stage_manager.stage:
-                self.hydra_viewport.update_geometry(self.stage_manager.current_time)
-            self.setCentralWidget(self.hydra_viewport)
-            self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
+            if not self.hydra_viewport:
+                QMessageBox.warning(self, "Hydra Not Available", "Hydra viewport is not available.")
+                return
+            try:
+                self.hydra_viewport.set_stage(self.stage_manager.stage)
+                if self.stage_manager.stage:
+                    self.hydra_viewport.update_geometry(self.stage_manager.current_time)
+                self.setCentralWidget(self.hydra_viewport)
+                self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
+            except RuntimeError:
+                QMessageBox.warning(self, "Error", "Failed to switch to Hydra viewport.")
         else:
             # Switch to OpenGL
-            self.setCentralWidget(self.viewport)
-            if self.stage_manager.stage:
-                self.viewport.update_geometry(self.stage_manager.current_time)
-            self.statusBar().showMessage("Using OpenGL rendering", 3000)
+            if not self.viewport:
+                return
+            try:
+                self.setCentralWidget(self.viewport)
+                if self.stage_manager.stage:
+                    self.viewport.update_geometry(self.stage_manager.current_time)
+                self.statusBar().showMessage("Using OpenGL rendering", 3000)
+            except RuntimeError:
+                QMessageBox.warning(self, "Error", "Failed to switch to OpenGL viewport.")
     
     def show_camera_manager(self):
         """Show camera manager dock"""
@@ -2772,6 +2814,42 @@ class USDViewerWindow(QMainWindow):
                     dock.show()
                     dock.raise_()
                     break
+    
+    def on_hierarchy_item_changed(self, item: QTreeWidgetItem, column: int):
+        """Handle hierarchy item checkbox change (visibility toggle)"""
+        if not USD_AVAILABLE or not self.stage_manager.stage:
+            return
+        
+        prim_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not prim_path or "::" in prim_path:
+            # Skip variant sets and collections
+            return
+        
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if not prim:
+                return
+            
+            imageable = UsdGeom.Imageable(prim)
+            if not imageable:
+                return
+            
+            # Get new visibility state
+            is_checked = item.checkState(0) == Qt.CheckState.Checked
+            visibility = UsdGeom.Tokens.inherited if is_checked else UsdGeom.Tokens.invisible
+            
+            # Set visibility
+            imageable.MakeVisible() if is_checked else imageable.MakeInvisible()
+            
+            # Update viewport
+            if self.viewport:
+                try:
+                    self.viewport.update_geometry(self.stage_manager.current_time)
+                    self.viewport.update()
+                except RuntimeError:
+                    pass
+        except Exception as e:
+            print(f"Error toggling visibility: {e}")
     
     def on_hierarchy_item_double_clicked(self, item: QTreeWidgetItem, column: int):
         """Handle double-click on hierarchy item for variant selection"""

@@ -34,7 +34,7 @@ class LayerCompositionManager:
         for layer in layers:
             layer_info = {
                 'identifier': layer.identifier,
-                'display_name': layer.displayName,
+                'display_name': layer.GetDisplayName(),
                 'real_path': layer.realPath if hasattr(layer, 'realPath') else None,
                 'anonymous': layer.anonymous,
                 'dirty': layer.dirty,
