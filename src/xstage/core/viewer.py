@@ -1012,19 +1012,27 @@ class USDViewerWindow(QMainWindow):
         """Create menu bar"""
         # #region agent log
         import json
-        log_path = "/Users/slavik/Documents/xStage/.cursor/debug.log"
+        # Detect project root dynamically
+        script_dir = Path(__file__).parent.parent.parent.parent
+        log_path = script_dir / ".cursor" / "debug.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "viewer.py:1011", "message": "create_menus called", "data": {}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-        except: pass
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "viewer.py:1011", "message": "create_menus called", "data": {"log_path": str(log_path)}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+        except Exception as e:
+            # Fallback: try to write to current directory
+            try:
+                with open(".cursor/debug.log", "a") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "viewer.py:1011", "message": "create_menus called (fallback)", "data": {"error": str(e)}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            except: pass
         # #endregion
         
         menubar = self.menuBar()
         
         # #region agent log
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "viewer.py:1014", "message": "menubar obtained", "data": {"menubar_valid": menubar is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "viewer.py:1030", "message": "menubar obtained", "data": {"menubar_valid": menubar is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
         except: pass
         # #endregion
         
@@ -1051,8 +1059,8 @@ class USDViewerWindow(QMainWindow):
         # View menu
         # #region agent log
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "viewer.py:1036", "message": "before view_menu creation", "data": {"menubar_valid": menubar is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "viewer.py:1059", "message": "before view_menu creation", "data": {"menubar_valid": menubar is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
         except: pass
         # #endregion
         
@@ -1061,16 +1069,16 @@ class USDViewerWindow(QMainWindow):
         
         # #region agent log
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "viewer.py:1037", "message": "view_menu created", "data": {"view_menu_valid": view_menu is not None, "view_menu_ptr": str(id(view_menu)) if view_menu else None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "viewer.py:1067", "message": "view_menu created", "data": {"view_menu_valid": view_menu is not None, "view_menu_ptr": str(id(view_menu)) if view_menu else None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
         except: pass
         # #endregion
         
         # Recent Files submenu
         # #region agent log
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "viewer.py:1039", "message": "before recent_files_menu creation", "data": {"view_menu_valid": view_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "viewer.py:1077", "message": "before recent_files_menu creation", "data": {"view_menu_valid": view_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
         except: pass
         # #endregion
         
@@ -1079,16 +1087,16 @@ class USDViewerWindow(QMainWindow):
         
         # #region agent log
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "viewer.py:1041", "message": "recent_files_menu created", "data": {"recent_files_menu_valid": self.recent_files_menu is not None, "view_menu_valid": view_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "viewer.py:1085", "message": "recent_files_menu created", "data": {"recent_files_menu_valid": self.recent_files_menu is not None, "view_menu_valid": view_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
         except: pass
         # #endregion
         
         # Bookmarks submenu
         # #region agent log
         try:
-            with open(log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "viewer.py:1075", "message": "before bookmarks_menu creation", "data": {"view_menu_valid": view_menu is not None, "view_menu_ptr": str(id(view_menu)) if view_menu else None, "recent_files_menu_valid": self.recent_files_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+            with open(str(log_path), "a") as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "viewer.py:1095", "message": "before bookmarks_menu creation", "data": {"view_menu_valid": view_menu is not None, "view_menu_ptr": str(id(view_menu)) if view_menu else None, "recent_files_menu_valid": self.recent_files_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
         except: pass
         # #endregion
         
@@ -1098,15 +1106,15 @@ class USDViewerWindow(QMainWindow):
             test_title = view_menu.title()
             # #region agent log
             try:
-                with open(log_path, "a") as f:
-                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "viewer.py:1082", "message": "view_menu accessibility test passed", "data": {"title": test_title}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+                with open(str(log_path), "a") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "viewer.py:1106", "message": "view_menu accessibility test passed", "data": {"title": test_title}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
             except: pass
             # #endregion
         except Exception as e:
             # #region agent log
             try:
-                with open(log_path, "a") as f:
-                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "viewer.py:1086", "message": "view_menu accessibility test failed", "data": {"error": str(e), "error_type": type(e).__name__}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+                with open(str(log_path), "a") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "E", "location": "viewer.py:1113", "message": "view_menu accessibility test failed", "data": {"error": str(e), "error_type": type(e).__name__}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
             except: pass
             # #endregion
             # Recreate view_menu if it was deleted
@@ -1118,15 +1126,15 @@ class USDViewerWindow(QMainWindow):
             self.bookmarks_actions = []
             # #region agent log
             try:
-                with open(log_path, "a") as f:
-                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "viewer.py:1095", "message": "bookmarks_menu created successfully", "data": {"bookmarks_menu_valid": self.bookmarks_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+                with open(str(log_path), "a") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "viewer.py:1125", "message": "bookmarks_menu created successfully", "data": {"bookmarks_menu_valid": self.bookmarks_menu is not None}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
             except: pass
             # #endregion
         except Exception as e:
             # #region agent log
             try:
-                with open(log_path, "a") as f:
-                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "viewer.py:1100", "message": "bookmarks_menu creation failed", "data": {"error": str(e), "error_type": type(e).__name__}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
+                with open(str(log_path), "a") as f:
+                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "viewer.py:1133", "message": "bookmarks_menu creation failed", "data": {"error": str(e), "error_type": type(e).__name__}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
             except: pass
             # #endregion
             raise
