@@ -1175,13 +1175,17 @@ class USDViewerWindow(QMainWindow):
                 self.setCentralWidget(self.hydra_viewport)
                 self.use_hydra = True
                 self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
-            except ImportError:
-                # UsdImagingGL not available, use OpenGL fallback
+            except (ImportError, Exception) as e:
+                # UsdImagingGL not available or failed to initialize, use OpenGL fallback
+                print(f"Hydra 2.0 viewport is not available: {e}")
+                print("Using OpenGL fallback")
                 self.hydra_viewport = None
                 self.setCentralWidget(self.viewport)
                 self.use_hydra = False
         except (ImportError, Exception) as e:
             # Hydra viewport class not available or failed to create
+            print(f"Hydra 2.0 viewport is not available: {e}")
+            print("Using OpenGL fallback")
             self.hydra_viewport = None
             self.setCentralWidget(self.viewport)
             self.use_hydra = False
@@ -1594,34 +1598,56 @@ class USDViewerWindow(QMainWindow):
         
     def create_playback_dock(self):
         """Create playback controls dock with improved UI (Xstudio-style)"""
-        dock = QDockWidget("Playback", self)
+        dock = QDockWidget(self)  # No title
+        dock.setTitleBarWidget(QWidget())  # Hide title bar
         playback_widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setSpacing(8)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout = QHBoxLayout()  # Single horizontal line
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center align
         
-        # Frame display and time info (top row)
-        info_layout = QHBoxLayout()
-        self.frame_label = QLabel("Frame: 0")
-        self.frame_label.setStyleSheet("font-weight: bold; font-size: 12pt; padding: 4px;")
-        info_layout.addWidget(self.frame_label)
+        # Playback buttons
+        first_frame_btn = QPushButton("⏮")
+        first_frame_btn.setToolTip("First Frame")
+        first_frame_btn.setFixedSize(32, 32)
+        first_frame_btn.clicked.connect(self.goto_first_frame)
+        first_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        layout.addWidget(first_frame_btn)
         
-        self.time_label = QLabel("Time: 0.00s")
-        self.time_label.setStyleSheet("color: #888; padding: 4px;")
-        info_layout.addWidget(self.time_label)
-        info_layout.addStretch()
-        layout.addLayout(info_layout)
+        prev_frame_btn = QPushButton("◀")
+        prev_frame_btn.setToolTip("Previous Frame")
+        prev_frame_btn.setFixedSize(32, 32)
+        prev_frame_btn.clicked.connect(self.prev_frame)
+        prev_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        layout.addWidget(prev_frame_btn)
         
-        # Timeline slider (main control)
-        timeline_layout = QVBoxLayout()
-        timeline_layout.setSpacing(4)
+        self.play_button = QPushButton("▶")
+        self.play_button.setToolTip("Play/Pause")
+        self.play_button.setFixedSize(40, 32)
+        self.play_button.clicked.connect(self.toggle_playback)
+        self.play_button.setStyleSheet("QPushButton { font-size: 16pt; font-weight: bold; }")
+        layout.addWidget(self.play_button)
         
-        slider_label = QLabel("Timeline")
-        slider_label.setStyleSheet("font-size: 9pt; color: #666;")
-        timeline_layout.addWidget(slider_label)
+        next_frame_btn = QPushButton("▶")
+        next_frame_btn.setToolTip("Next Frame")
+        next_frame_btn.setFixedSize(32, 32)
+        next_frame_btn.clicked.connect(self.next_frame)
+        next_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        layout.addWidget(next_frame_btn)
         
+        last_frame_btn = QPushButton("⏭")
+        last_frame_btn.setToolTip("Last Frame")
+        last_frame_btn.setFixedSize(32, 32)
+        last_frame_btn.clicked.connect(self.goto_last_frame)
+        last_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
+        layout.addWidget(last_frame_btn)
+        
+        layout.addSpacing(20)  # Spacer between buttons and timeline
+        
+        # Timeline slider
         self.timeline_slider = QSlider(Qt.Orientation.Horizontal)
         self.timeline_slider.valueChanged.connect(self.on_timeline_changed)
+        self.timeline_slider.setMinimumWidth(200)
         self.timeline_slider.setStyleSheet("""
             QSlider::groove:horizontal {
                 border: 1px solid #999;
@@ -1640,68 +1666,32 @@ class USDViewerWindow(QMainWindow):
                 background: #66BB6A;
             }
         """)
-        timeline_layout.addWidget(self.timeline_slider)
-        layout.addLayout(timeline_layout)
+        layout.addWidget(self.timeline_slider)
         
-        # Playback buttons (styled like Xstudio)
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(6)
+        layout.addSpacing(20)  # Spacer between timeline and info
         
-        first_frame_btn = QPushButton("⏮")
-        first_frame_btn.setToolTip("First Frame")
-        first_frame_btn.setFixedSize(32, 32)
-        first_frame_btn.clicked.connect(self.goto_first_frame)
-        first_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
-        button_layout.addWidget(first_frame_btn)
+        # Frame and time display
+        self.frame_label = QLabel("Frame: 0")
+        self.frame_label.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 4px;")
+        layout.addWidget(self.frame_label)
         
-        prev_frame_btn = QPushButton("◀")
-        prev_frame_btn.setToolTip("Previous Frame")
-        prev_frame_btn.setFixedSize(32, 32)
-        prev_frame_btn.clicked.connect(self.prev_frame)
-        prev_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
-        button_layout.addWidget(prev_frame_btn)
+        self.time_label = QLabel("Time: 0.00s")
+        self.time_label.setStyleSheet("color: #888; font-size: 10pt; padding: 4px;")
+        layout.addWidget(self.time_label)
         
-        self.play_button = QPushButton("▶")
-        self.play_button.setToolTip("Play/Pause")
-        self.play_button.setFixedSize(40, 32)
-        self.play_button.clicked.connect(self.toggle_playback)
-        self.play_button.setStyleSheet("QPushButton { font-size: 16pt; font-weight: bold; }")
-        button_layout.addWidget(self.play_button)
+        layout.addSpacing(20)  # Spacer between info and FPS
         
-        next_frame_btn = QPushButton("▶")
-        next_frame_btn.setToolTip("Next Frame")
-        next_frame_btn.setFixedSize(32, 32)
-        next_frame_btn.clicked.connect(self.next_frame)
-        next_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
-        button_layout.addWidget(next_frame_btn)
-        
-        last_frame_btn = QPushButton("⏭")
-        last_frame_btn.setToolTip("Last Frame")
-        last_frame_btn.setFixedSize(32, 32)
-        last_frame_btn.clicked.connect(self.goto_last_frame)
-        last_frame_btn.setStyleSheet("QPushButton { font-size: 14pt; }")
-        button_layout.addWidget(last_frame_btn)
-        
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-        
-        # FPS and range controls (bottom row)
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(10)
-        
+        # FPS control
         fps_label = QLabel("FPS:")
-        fps_label.setStyleSheet("color: #888;")
-        controls_layout.addWidget(fps_label)
+        fps_label.setStyleSheet("color: #888; font-size: 10pt;")
+        layout.addWidget(fps_label)
         
         self.fps_spinbox = QSpinBox()
         self.fps_spinbox.setRange(1, 120)
         self.fps_spinbox.setValue(24)
         self.fps_spinbox.setFixedWidth(60)
         self.fps_spinbox.valueChanged.connect(self.on_fps_changed)
-        controls_layout.addWidget(self.fps_spinbox)
-        
-        controls_layout.addStretch()
-        layout.addLayout(controls_layout)
+        layout.addWidget(self.fps_spinbox)
         
         playback_widget.setLayout(layout)
         dock.setWidget(playback_widget)
