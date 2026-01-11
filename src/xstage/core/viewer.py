@@ -700,10 +700,19 @@ class ViewportWidget(QOpenGLWidget):
         self.camera_rotation_y = 45.0
         self.camera_target = np.array([0.0, 0.0, 0.0])
         
+        # Store initial camera state (home position)
+        self.home_camera_distance = 10.0
+        self.home_camera_rotation_x = 30.0
+        self.home_camera_rotation_y = 45.0
+        self.home_camera_target = np.array([0.0, 0.0, 0.0])
+        
         # Mouse interaction
         self.last_mouse_pos = None
         self.is_rotating = False
         self.is_panning = False
+        
+        # Enable keyboard focus for shortcuts
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
     def set_stage_manager(self, manager: USDStageManager):
         """Set the USD stage manager"""
@@ -729,6 +738,29 @@ class ViewportWidget(QOpenGLWidget):
         self.camera_target = bounds['center']
         size = np.max(bounds['size'])
         self.camera_distance = size * 2.0
+        self.update()
+    
+    def frame_selected(self):
+        """Frame selected prim or all geometry (F key)"""
+        if not self.geometry_data:
+            return
+        
+        # Frame all geometry bounds
+        if 'bounds' in self.geometry_data and self.geometry_data['bounds']:
+            self.frame_bounds(self.geometry_data['bounds'])
+        else:
+            # Fallback: frame to origin
+            self.camera_target = np.array([0.0, 0.0, 0.0])
+            self.camera_distance = 10.0
+            self.update()
+    
+    def go_home(self):
+        """Reset camera to initial/home position (H key)"""
+        self.camera_distance = self.home_camera_distance
+        self.camera_rotation_x = self.home_camera_rotation_x
+        self.camera_rotation_y = self.home_camera_rotation_y
+        self.camera_target = self.home_camera_target.copy()
+        self.update()
         
     def initializeGL(self):
         """Initialize OpenGL settings"""
@@ -935,6 +967,25 @@ class ViewportWidget(QOpenGLWidget):
             self.update()
             
         self.last_mouse_pos = pos
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts for viewport navigation"""
+        key = event.key()
+        
+        # F key: Frame selected/all geometry
+        if key == Qt.Key.Key_F:
+            self.frame_selected()
+            event.accept()
+            return
+        
+        # H key: Go home (reset camera to initial position)
+        elif key == Qt.Key.Key_H:
+            self.go_home()
+            event.accept()
+            return
+        
+        # Let parent handle other keys
+        super().keyPressEvent(event)
         
     def wheelEvent(self, event):
         """Handle mouse wheel for zoom"""
@@ -948,6 +999,25 @@ class ViewportWidget(QOpenGLWidget):
             
         self.camera_distance = np.clip(self.camera_distance, 0.1, 1000.0)
         self.update()
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts"""
+        key = event.key()
+        
+        # F key: Frame selected/all
+        if key == Qt.Key.Key_F:
+            self.frame_selected()
+            event.accept()
+            return
+        
+        # H key: Go home (reset camera)
+        elif key == Qt.Key.Key_H:
+            self.go_home()
+            event.accept()
+            return
+        
+        # Let parent handle other keys
+        super().keyPressEvent(event)
 
 
 class USDViewerWindow(QMainWindow):

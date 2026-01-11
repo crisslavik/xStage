@@ -43,6 +43,12 @@ class HydraViewportWidget(QOpenGLWidget):
         self.camera_rotation_y = 45.0
         self.camera_target = Gf.Vec3d(0.0, 0.0, 0.0)
         
+        # Store initial camera state (home position)
+        self.home_camera_distance = 10.0
+        self.home_camera_rotation_x = 30.0
+        self.home_camera_rotation_y = 45.0
+        self.home_camera_target = Gf.Vec3d(0.0, 0.0, 0.0)
+        
         # View settings
         self.background_color = Gf.Vec4f(0.18, 0.18, 0.18, 1.0)
         self.camera_fov = 60.0
@@ -300,6 +306,27 @@ class HydraViewportWidget(QOpenGLWidget):
         
         self.camera_distance = np.clip(self.camera_distance, 0.01, 100000.0)
         self.update()
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts for viewport navigation"""
+        from PySide6.QtCore import Qt
+        
+        key = event.key()
+        
+        # F key: Frame selected/all geometry
+        if key == Qt.Key.Key_F:
+            self.frame_selected()
+            event.accept()
+            return
+        
+        # H key: Go home (reset camera to initial position)
+        elif key == Qt.Key.Key_H:
+            self.go_home()
+            event.accept()
+            return
+        
+        # Let parent handle other keys
+        super().keyPressEvent(event)
     
     def is_hydra_available(self) -> bool:
         """Check if Hydra is available and working"""
