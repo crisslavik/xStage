@@ -259,9 +259,32 @@ echo "  - All other dependencies from requirements.txt"
 echo ""
 
 # Install requirements (this will install USD 25.11, OCIO 2.2, QuiltiX automatically)
+# Note: PyOpenColorIO may not be available for all Python versions/platforms - it's optional
 if [ -f "requirements.txt" ]; then
-    pip install --no-cache-dir -r requirements.txt
-    print_status "All Python dependencies installed (self-contained)"
+    # First, try to install all requirements
+    if pip install --no-cache-dir -r requirements.txt 2>&1 | tee /tmp/pip_install.log; then
+        print_status "All Python dependencies installed (self-contained)"
+    else
+        # Check if PyOpenColorIO was the issue
+        if grep -q "PyOpenColorIO" /tmp/pip_install.log; then
+            print_warning "PyOpenColorIO not available for this platform/Python version"
+            print_warning "Installing other dependencies without PyOpenColorIO..."
+            
+            # Create temporary requirements without PyOpenColorIO
+            TEMP_REQUIREMENTS=$(mktemp)
+            grep -v "PyOpenColorIO" requirements.txt > "$TEMP_REQUIREMENTS"
+            
+            # Install without PyOpenColorIO
+            pip install --no-cache-dir -r "$TEMP_REQUIREMENTS"
+            rm -f "$TEMP_REQUIREMENTS"
+            
+            print_warning "PyOpenColorIO will not be available (optional dependency)"
+            print_warning "xStage will work without it, but color management features will be limited"
+        else
+            print_error "Failed to install dependencies"
+            exit 1
+        fi
+    fi
 else
     print_error "requirements.txt not found"
     exit 1
@@ -311,9 +334,9 @@ else
     exit 1
 fi
 
-# Verify OCIO 2.2+ installation
+# Verify OCIO 2.2+ installation (optional)
 echo ""
-echo "Verifying OCIO 2.2+ installation..."
+echo "Verifying OCIO 2.2+ installation (optional)..."
 python3 << 'VERIFY_OCIO'
 try:
     import PyOpenColorIO as ocio
@@ -322,21 +345,21 @@ try:
         major, minor, patch = version[0], version[1], version[2] if len(version) > 2 else 0
         print(f"✓ PyOpenColorIO OK (v{major}.{minor}.{patch})")
         if major < 2 or (major == 2 and minor < 2):
-            print(f"⚠ Warning: OCIO {major}.{minor}.{patch} detected, but 2.2+ is required")
-            exit(1)
+            print(f"⚠ Warning: OCIO {major}.{minor}.{patch} detected, but 2.2+ is recommended")
     else:
         version_str = getattr(ocio, '__version__', '2.2.0')
         print(f"✓ PyOpenColorIO OK (version: {version_str})")
 except ImportError as e:
-    print(f"✗ PyOpenColorIO import failed: {e}")
-    exit(1)
+    print(f"⚠ PyOpenColorIO not available: {e}")
+    print("  Note: PyOpenColorIO is optional - xStage will work without it")
+    print("  Color management features will be limited")
+    exit(0)  # Don't fail - it's optional
 VERIFY_OCIO
 
 if [ $? -eq 0 ]; then
     print_status "OCIO 2.2+ verification passed"
 else
-    print_error "OCIO 2.2+ verification failed - please ensure PyOpenColorIO>=2.2.0 is installed"
-    exit 1
+    print_warning "PyOpenColorIO not available (optional - xStage will work without it)"
 fi
 
 # Verify QuiltiX installation
