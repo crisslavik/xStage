@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QSplitter, QInputDialog, QTabWidget
 )
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QThread
-from PySide6.QtGui import QAction, QKeySequence, QIcon, QPalette, QColor
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QPalette, QColor, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -617,6 +617,13 @@ class ViewportWidget(QOpenGLWidget):
     """OpenGL viewport for USD rendering"""
     
     def __init__(self, parent=None):
+        # Configure OpenGL format for compatibility profile (supports deprecated functions)
+        fmt = QSurfaceFormat()
+        fmt.setVersion(2, 1)  # OpenGL 2.1
+        fmt.setProfile(QSurfaceFormat.CompatibilityProfile)  # Compatibility profile (not Core)
+        fmt.setSamples(4)  # 4x MSAA
+        QSurfaceFormat.setDefaultFormat(fmt)
+        
         super().__init__(parent)
         self.stage_manager = None
         self.geometry_data = {}
