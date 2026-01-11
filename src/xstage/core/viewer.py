@@ -1018,7 +1018,7 @@ class USDViewerWindow(QMainWindow):
         
     def init_ui(self):
         """Initialize user interface"""
-        self.setWindowTitle("USD Viewer - NOX VFX")
+        self.setWindowTitle("xStage")
         self.setGeometry(100, 100, 1600, 900)
         
         # Create central widget with viewport
@@ -1686,7 +1686,7 @@ class USDViewerWindow(QMainWindow):
             self.cache_manager.clear_cache_for_file(filepath)
             
             self.statusBar().showMessage(f"Loaded: {filepath}", 5000)
-            self.setWindowTitle(f"USD Viewer - {Path(filepath).name}")
+            self.setWindowTitle(f"xStage - {Path(filepath).name}")
         else:
             QMessageBox.critical(self, "Error", f"Failed to load USD file:\n{filepath}")
             self.statusBar().showMessage("Ready")
@@ -2820,8 +2820,8 @@ def main():
     print(f"DISPLAY={os.environ.get('DISPLAY', 'NOT SET')}", file=sys.stderr)
     
     app = QApplication(sys.argv)
-    app.setApplicationName("USD Viewer")
-    app.setOrganizationName("NOX VFX")
+    app.setApplicationName("xStage")
+    app.setOrganizationName("xStage")
     
     # Verify platform after QApplication creation
     platform_name = app.platformName()
