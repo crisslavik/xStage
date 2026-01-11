@@ -175,6 +175,21 @@ else
     fi
     
     print_status "Python 3.11 verified: $PYTHON_VERSION"
+    
+    # Verify ctypes module is available (needed for OpenGL)
+    echo "Verifying Python ctypes module..."
+    if "$USE_PYTHON" -c "import ctypes; import _ctypes" 2>/dev/null; then
+        print_status "Python ctypes module OK"
+    else
+        print_error "Python ctypes module is missing!"
+        print_error "This usually means Python was compiled without libffi support"
+        print_error "or the libffi runtime library is missing."
+        print_error ""
+        print_error "Please ensure libffi and libffi-devel are installed, then:"
+        print_error "  1. Remove the Python installation: rm -rf $PYTHON_DIR"
+        print_error "  2. Re-run this install script"
+        exit 1
+    fi
 fi
 
 # Install system dependencies (needed for Python 3.11 compilation and USD)
