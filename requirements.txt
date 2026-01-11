@@ -25,7 +25,7 @@ psutil>=5.9.0  # For memory/system stats in viewport HUD
 PyOpenColorIO>=2.2.0  # OpenColorIO Python bindings for color space management
 
 # MaterialX editor (optional, for material editing)
-quiltix>=1.0.0; python_version >= "3.9"  # QuiltiX MaterialX editor (optional)
+quiltix>=0.8.0; python_version >= "3.9"  # QuiltiX MaterialX editor (optional)
 
 # Format conversion support
 pygltflib>=1.16.0  # For glTF/GLB import

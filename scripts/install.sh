@@ -272,21 +272,40 @@ if [ -f "requirements.txt" ]; then
         print_status "All Python dependencies installed (self-contained)"
         rm -f "$PIP_OUTPUT"
     else
-        # Check if PyOpenColorIO was the issue
-        if grep -q "PyOpenColorIO" "$PIP_OUTPUT"; then
-            print_warning "PyOpenColorIO not available for this platform/Python version"
-            print_warning "Installing other dependencies without PyOpenColorIO..."
+        # Check if PyOpenColorIO or QuiltiX was the issue
+        if grep -q "PyOpenColorIO\|quiltix" "$PIP_OUTPUT"; then
+            print_warning "Some optional dependencies not available for this platform/Python version"
+            print_warning "Installing other dependencies without optional packages..."
             
-            # Create temporary requirements without PyOpenColorIO
+            # Create temporary requirements without optional packages
             TEMP_REQUIREMENTS=$(mktemp)
-            grep -v "PyOpenColorIO" requirements.txt > "$TEMP_REQUIREMENTS"
+            grep -v "PyOpenColorIO" requirements.txt | grep -v "quiltix" > "$TEMP_REQUIREMENTS"
             
-            # Install without PyOpenColorIO (this should succeed)
+            # Install without optional packages (this should succeed)
+            set +e  # Temporarily disable exit on error
             pip install --no-cache-dir -r "$TEMP_REQUIREMENTS"
+            INSTALL_EXIT=$?
+            set -e  # Re-enable exit on error
+            
+            if [ $INSTALL_EXIT -eq 0 ]; then
+                print_status "Core dependencies installed successfully"
+            else
+                print_error "Failed to install core dependencies"
+                cat "$PIP_OUTPUT"
+                rm -f "$TEMP_REQUIREMENTS" "$PIP_OUTPUT"
+                exit 1
+            fi
+            
             rm -f "$TEMP_REQUIREMENTS"
             
-            print_warning "PyOpenColorIO will not be available (optional dependency)"
-            print_warning "xStage will work without it, but color management features will be limited"
+            if grep -q "PyOpenColorIO" "$PIP_OUTPUT"; then
+                print_warning "PyOpenColorIO will not be available (optional dependency)"
+                print_warning "xStage will work without it, but color management features will be limited"
+            fi
+            if grep -q "quiltix" "$PIP_OUTPUT"; then
+                print_warning "QuiltiX will not be available (optional dependency)"
+                print_warning "xStage will work without it, but MaterialX editing features will be limited"
+            fi
         else
             print_error "Failed to install dependencies"
             cat "$PIP_OUTPUT"
