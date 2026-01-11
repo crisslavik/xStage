@@ -2758,27 +2758,32 @@ class USDViewerWindow(QMainWindow):
 
 def main():
     """Application entry point"""
-    # Force xcb (X11) platform plugin for better compatibility on Linux
-    # EGL can fail on some systems, so we prefer xcb which is more reliable
-    if 'QT_QPA_PLATFORM' not in os.environ:
-        # Check if running under Wayland
-        wayland_display = os.environ.get('WAYLAND_DISPLAY')
-        xdg_session_type = os.environ.get('XDG_SESSION_TYPE', '').lower()
-        
-        if wayland_display or xdg_session_type == 'wayland':
-            # Try Wayland first, but fall back to xcb if it fails
-            os.environ['QT_QPA_PLATFORM'] = 'wayland'
-        else:
-            # Explicitly use xcb (X11) for better OpenGL support
-            os.environ['QT_QPA_PLATFORM'] = 'xcb'
+    # CRITICAL: Set platform BEFORE importing QApplication
+    # Force xcb (X11) platform plugin - EGL is failing on this system
+    # Must be set before any Qt imports or QApplication creation
+    import os
+    os.environ['QT_QPA_PLATFORM'] = 'xcb'
+    os.environ['QT_OPENGL'] = 'desktop'
     
-    # Set OpenGL backend to desktop (not EGL) for better compatibility
-    if 'QT_OPENGL' not in os.environ:
-        os.environ['QT_OPENGL'] = 'desktop'
+    # Disable EGL explicitly
+    os.environ['QT_XCB_GL_INTEGRATION'] = 'xcb_glx'
+    
+    # Debug: Print what we're setting
+    print(f"Setting QT_QPA_PLATFORM={os.environ.get('QT_QPA_PLATFORM')}", file=sys.stderr)
+    print(f"Setting QT_OPENGL={os.environ.get('QT_OPENGL')}", file=sys.stderr)
+    print(f"DISPLAY={os.environ.get('DISPLAY', 'NOT SET')}", file=sys.stderr)
     
     app = QApplication(sys.argv)
     app.setApplicationName("USD Viewer")
     app.setOrganizationName("NOX VFX")
+    
+    # Verify platform after QApplication creation
+    platform_name = app.platformName()
+    print(f"Qt is using platform: {platform_name}", file=sys.stderr)
+    
+    if platform_name != 'xcb':
+        print(f"WARNING: Qt is using {platform_name} instead of xcb!", file=sys.stderr)
+        print("This may cause OpenGL context creation failures.", file=sys.stderr)
     
     try:
         window = USDViewerWindow()
@@ -2789,8 +2794,10 @@ def main():
         print("\nTroubleshooting tips:", file=sys.stderr)
         print("1. Ensure you have proper graphics drivers installed", file=sys.stderr)
         print("2. Check that X11 is running: echo $DISPLAY", file=sys.stderr)
-        print("3. Try setting QT_QPA_PLATFORM=xcb explicitly", file=sys.stderr)
-        print("4. Install OpenGL libraries: sudo dnf install mesa-libGL mesa-libGLU", file=sys.stderr)
+        print("3. Install OpenGL libraries: sudo dnf install mesa-libGL mesa-libGLU mesa-libEGL", file=sys.stderr)
+        print("4. Install xcb libraries: sudo dnf install libxcb libxcb-devel", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
