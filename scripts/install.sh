@@ -190,6 +190,7 @@ PACKAGES=(
     "sqlite-devel"
     "xz-devel"
     "libffi-devel"
+    "libffi"  # Runtime library needed for ctypes
     "zlib-devel"
     "mesa-libGL-devel"
     "mesa-libGLU-devel"
