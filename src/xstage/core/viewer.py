@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QProgressDialog, QComboBox, QSpinBox, QGroupBox,
     QFormLayout, QSplitter, QInputDialog, QTabWidget
 )
-from PySide6.QtCore import Qt, QTimer, Signal, Slot, QThread
-from PySide6.QtGui import QAction, QKeySequence, QIcon, QPalette, QColor, QSurfaceFormat
+from PySide6.QtCore import Qt, QTimer, Signal, Slot, QThread, QUrl
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QPalette, QColor, QSurfaceFormat, QDragEnterEvent, QDropEvent
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -1021,6 +1021,9 @@ class USDViewerWindow(QMainWindow):
         self.setWindowTitle("xStage")
         self.setGeometry(100, 100, 1600, 900)
         
+        # Enable drag and drop for USD files
+        self.setAcceptDrops(True)
+        
         # Create central widget with viewport
         # Try to use Hydra viewport if available, fallback to OpenGL
         try:
@@ -1514,6 +1517,34 @@ class USDViewerWindow(QMainWindow):
         
         if filepath:
             self.load_usd_file(filepath)
+    
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        """Handle drag enter event for file drops"""
+        if event.mimeData().hasUrls():
+            # Check if any of the dropped files are USD files
+            for url in event.mimeData().urls():
+                filepath = url.toLocalFile()
+                if filepath:
+                    file_ext = Path(filepath).suffix.lower()
+                    if file_ext in ['.usd', '.usda', '.usdc', '.usdz']:
+                        event.acceptProposedAction()
+                        return
+        event.ignore()
+    
+    def dropEvent(self, event: QDropEvent):
+        """Handle drop event for file drops"""
+        if event.mimeData().hasUrls():
+            # Get the first USD file from the dropped files
+            for url in event.mimeData().urls():
+                filepath = url.toLocalFile()
+                if filepath:
+                    file_ext = Path(filepath).suffix.lower()
+                    if file_ext in ['.usd', '.usda', '.usdc', '.usdz']:
+                        # Load the USD file
+                        self.load_usd_file(filepath)
+                        event.acceptProposedAction()
+                        return
+        event.ignore()
             
     def load_usd_file(self, filepath: str):
         """Load and display USD file"""
