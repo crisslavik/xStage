@@ -134,35 +134,6 @@ else
         # Extract and compile
         if [ ! -d "Python-${PYTHON_VERSION}" ]; then
             tar -xzf "Python-${PYTHON_VERSION}.tgz"
-cris@alien:~/Documents/xStage$ xstage
-Warning: PyOpenColorIO not available. Install with: pip install PyOpenColorIO
-QEGLPlatformContext: Failed to create context: 3009
-QRhiGles2: Failed to create temporary context
-QEGLPlatformContext: Failed to create context: 3009
-QRhiGles2: Failed to create context
-Failed to create QRhi for QBackingStoreRhiSupport
-QEGLPlatformContext: Failed to create context: 3009
-QOpenGLWidget: Failed to create context
-QEGLPlatformContext: Failed to create context: 3009
-QOpenGLWidget: Failed to create context
-QEGLPlatformContext: Failed to create context: 3009
-QOpenGLWidget: Failed to create context
-^CTraceback (most recent call last):
-  File "/home/cris/Documents/xStage/src/xstage/utils/viewport_overlay.py", line 71, in update_memory
-    def update_memory(self):
-
-KeyboardInterrupt
-^CTraceback (most recent call last):
-  File "/home/cris/Documents/xStage/src/xstage/utils/viewport_overlay.py", line 57, in update_fps
-    def update_fps(self):
-
-KeyboardInterrupt
-^CTraceback (most recent call last):
-  File "/home/cris/Documents/xStage/src/xstage/utils/viewport_overlay.py", line 71, in update_memory
-    def update_memory(self):
-
-KeyboardInterrupt
-
         fi
         
         cd "Python-${PYTHON_VERSION}"
