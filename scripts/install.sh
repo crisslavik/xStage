@@ -261,12 +261,19 @@ echo ""
 # Install requirements (this will install USD 25.11, OCIO 2.2, QuiltiX automatically)
 # Note: PyOpenColorIO may not be available for all Python versions/platforms - it's optional
 if [ -f "requirements.txt" ]; then
-    # First, try to install all requirements
-    if pip install --no-cache-dir -r requirements.txt 2>&1 | tee /tmp/pip_install.log; then
+    # Try to install all requirements, but don't fail if PyOpenColorIO is missing
+    PIP_OUTPUT=$(mktemp)
+    set +e  # Temporarily disable exit on error
+    pip install --no-cache-dir -r requirements.txt 2>&1 | tee "$PIP_OUTPUT"
+    PIP_EXIT_CODE=${PIPESTATUS[0]}
+    set -e  # Re-enable exit on error
+    
+    if [ $PIP_EXIT_CODE -eq 0 ]; then
         print_status "All Python dependencies installed (self-contained)"
+        rm -f "$PIP_OUTPUT"
     else
         # Check if PyOpenColorIO was the issue
-        if grep -q "PyOpenColorIO" /tmp/pip_install.log; then
+        if grep -q "PyOpenColorIO" "$PIP_OUTPUT"; then
             print_warning "PyOpenColorIO not available for this platform/Python version"
             print_warning "Installing other dependencies without PyOpenColorIO..."
             
@@ -274,7 +281,7 @@ if [ -f "requirements.txt" ]; then
             TEMP_REQUIREMENTS=$(mktemp)
             grep -v "PyOpenColorIO" requirements.txt > "$TEMP_REQUIREMENTS"
             
-            # Install without PyOpenColorIO
+            # Install without PyOpenColorIO (this should succeed)
             pip install --no-cache-dir -r "$TEMP_REQUIREMENTS"
             rm -f "$TEMP_REQUIREMENTS"
             
@@ -282,8 +289,11 @@ if [ -f "requirements.txt" ]; then
             print_warning "xStage will work without it, but color management features will be limited"
         else
             print_error "Failed to install dependencies"
+            cat "$PIP_OUTPUT"
+            rm -f "$PIP_OUTPUT"
             exit 1
         fi
+        rm -f "$PIP_OUTPUT"
     fi
 else
     print_error "requirements.txt not found"
