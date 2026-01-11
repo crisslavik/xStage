@@ -79,6 +79,19 @@ check_python311() {
 if [ -f "$PYTHON_BIN" ]; then
     PYTHON_VERSION=$("$PYTHON_BIN" --version 2>&1 | awk '{print $2}')
     print_status "Python 3.11 found in xStage directory: $PYTHON_VERSION"
+    
+    # Verify ctypes module is available (critical for OpenGL)
+    if ! "$PYTHON_BIN" -c "import ctypes; import _ctypes" 2>/dev/null; then
+        print_error "Python ctypes module is missing in existing installation!"
+        print_error "This Python was compiled without libffi support."
+        print_error ""
+        print_error "To fix this, you need to reinstall Python 3.11:"
+        print_error "  1. Remove the existing Python: rm -rf $PYTHON_DIR"
+        print_error "  2. Ensure libffi and libffi-devel are installed: sudo dnf install -y libffi libffi-devel"
+        print_error "  3. Re-run this install script"
+        exit 1
+    fi
+    
     USE_PYTHON="$PYTHON_BIN"
 elif check_python311; then
     print_status "Python 3.11 found in system: $PYTHON_VERSION"
