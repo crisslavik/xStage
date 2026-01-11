@@ -45,8 +45,10 @@ try:
     # Try to import UsdCollectionAPI separately as it may not be available in all USD versions
     try:
         from pxr import UsdCollectionAPI
+        USDCOLLECTIONAPI_AVAILABLE = True
     except ImportError:
         # UsdCollectionAPI not available - create fallback class
+        USDCOLLECTIONAPI_AVAILABLE = False
         class UsdCollectionAPI:
             @staticmethod
             def GetAllCollectionAPIs(prim):
@@ -61,6 +63,7 @@ except ImportError:
     # Create dummy classes for type hints
     USDLUX_LIGHTAPI_AVAILABLE = False
     USDLUX_COLORSPACEAPI_AVAILABLE = False
+    USDCOLLECTIONAPI_AVAILABLE = False
     class UsdLux:
         pass
     class UsdCollectionAPI:
@@ -221,7 +224,7 @@ class USDStageManager:
                 if material_data:
                     geometry_data['materials'].append(material_data)
                     
-            elif USD_AVAILABLE and prim.HasAPI(UsdCollectionAPI):
+            elif USD_AVAILABLE and USDCOLLECTIONAPI_AVAILABLE and prim.HasAPI(UsdCollectionAPI):
                 collection_data = self._extract_collection(prim, time_code)
                 if collection_data:
                     geometry_data['collections'].append(collection_data)
@@ -413,7 +416,7 @@ class USDStageManager:
     def _extract_collection(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
         """Extract collection data"""
         try:
-            if not USD_AVAILABLE:
+            if not USD_AVAILABLE or not USDCOLLECTIONAPI_AVAILABLE:
                 return None
                 
             collection_apis = UsdCollectionAPI.GetAllCollectionAPIs(prim)
