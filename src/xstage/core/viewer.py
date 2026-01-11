@@ -2758,26 +2758,40 @@ class USDViewerWindow(QMainWindow):
 
 def main():
     """Application entry point"""
-    # Auto-detect display server and set appropriate Qt platform
-    # This handles both X11 and Wayland environments
+    # Force xcb (X11) platform plugin for better compatibility on Linux
+    # EGL can fail on some systems, so we prefer xcb which is more reliable
     if 'QT_QPA_PLATFORM' not in os.environ:
         # Check if running under Wayland
         wayland_display = os.environ.get('WAYLAND_DISPLAY')
         xdg_session_type = os.environ.get('XDG_SESSION_TYPE', '').lower()
         
         if wayland_display or xdg_session_type == 'wayland':
-            # Use Wayland if available
+            # Try Wayland first, but fall back to xcb if it fails
             os.environ['QT_QPA_PLATFORM'] = 'wayland'
-        # Otherwise, Qt will default to xcb (X11)
+        else:
+            # Explicitly use xcb (X11) for better OpenGL support
+            os.environ['QT_QPA_PLATFORM'] = 'xcb'
+    
+    # Set OpenGL backend to desktop (not EGL) for better compatibility
+    if 'QT_OPENGL' not in os.environ:
+        os.environ['QT_OPENGL'] = 'desktop'
     
     app = QApplication(sys.argv)
     app.setApplicationName("USD Viewer")
     app.setOrganizationName("NOX VFX")
     
-    window = USDViewerWindow()
-    window.show()
-    
-    sys.exit(app.exec())
+    try:
+        window = USDViewerWindow()
+        window.show()
+        sys.exit(app.exec())
+    except Exception as e:
+        print(f"Error starting application: {e}", file=sys.stderr)
+        print("\nTroubleshooting tips:", file=sys.stderr)
+        print("1. Ensure you have proper graphics drivers installed", file=sys.stderr)
+        print("2. Check that X11 is running: echo $DISPLAY", file=sys.stderr)
+        print("3. Try setting QT_QPA_PLATFORM=xcb explicitly", file=sys.stderr)
+        print("4. Install OpenGL libraries: sudo dnf install mesa-libGL mesa-libGLU", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
