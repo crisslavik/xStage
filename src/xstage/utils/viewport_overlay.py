@@ -172,89 +172,16 @@ class ViewportOverlay(QWidget):
             # Draw text inside box
             y_pos = y_offset + padding + line_height
             
-            # Draw FPS
-            if self.show_fps:
-                fps_text = f"FPS: {self.fps:.1f}"
-                text_rect = painter.fontMetrics().boundingRect(fps_text)
-                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
-                bg_rect.moveTopLeft(QPoint(x_offset, y_offset))
+            # Draw all content lines
+            for i, line in enumerate(content_lines):
+                # Use highlight color for selection and color space
+                use_highlight = (self.show_selection and self.selected_prim and line.startswith("Selected:")) or \
+                               (self.color_space_info and line.startswith("Color Space:"))
+                pen_color = highlight_color if use_highlight else text_color
                 
-                painter.fillRect(bg_rect, bg_color)
-                painter.setPen(QPen(text_color))
-                painter.drawText(x_offset, y_offset + text_rect.height(), fps_text)
-                y_offset += line_height + 5
-            
-            # Draw statistics
-            if self.show_stats and self.stats:
-                for key, value in list(self.stats.items())[:5]:  # Show first 5 stats
-                    stat_text = f"{key}: {value}"
-                    text_rect = painter.fontMetrics().boundingRect(stat_text)
-                    bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
-                    bg_rect.moveTopLeft(QPoint(x_offset, y_offset))
-                    
-                    painter.fillRect(bg_rect, bg_color)
-                    painter.setPen(QPen(text_color))
-                    painter.drawText(x_offset, y_offset + text_rect.height(), stat_text)
-                    y_offset += line_height
-            
-            # Draw memory usage
-            if self.show_memory and self.memory_usage > 0:
-                memory_text = f"Memory: {self.memory_usage:.1f} MB"
-                text_rect = painter.fontMetrics().boundingRect(memory_text)
-                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
-                bg_rect.moveTopLeft(QPoint(x_offset, y_offset))
-                
-                painter.fillRect(bg_rect, bg_color)
-                painter.setPen(QPen(text_color))
-                painter.drawText(x_offset, y_offset + text_rect.height(), memory_text)
-                y_offset += line_height + 5
-            
-            # Draw selection info
-            if self.show_selection and self.selected_prim:
-                selection_text = f"Selected: {self.selected_prim[:40]}"
-                if len(self.selected_prim) > 40:
-                    selection_text += "..."
-                text_rect = painter.fontMetrics().boundingRect(selection_text)
-                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
-                bg_rect.moveTopLeft(QPoint(x_offset, y_offset))
-                
-                painter.fillRect(bg_rect, bg_color)
-                painter.setPen(QPen(highlight_color))
-                painter.drawText(x_offset, y_offset + text_rect.height(), selection_text)
-                y_offset += line_height + 5
-            
-            # Draw camera info
-            if self.show_camera and self.camera_info:
-                camera_text = f"Camera: {self.camera_info.get('name', 'N/A')}"
-                if 'fov' in self.camera_info:
-                    camera_text += f" | FOV: {self.camera_info['fov']:.1f}°"
-                text_rect = painter.fontMetrics().boundingRect(camera_text)
-                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
-                bg_rect.moveTopLeft(QPoint(x_offset, y_offset))
-                
-                painter.fillRect(bg_rect, bg_color)
-                painter.setPen(QPen(text_color))
-                painter.drawText(x_offset, y_offset + text_rect.height(), camera_text)
-                y_offset += line_height + 5
-            
-            # Draw color space info (if OCIO available)
-            if self.color_space_info and self.color_space_info.get('ocio_available', False):
-                asset_cs = self.color_space_info.get('asset_color_space', 'Unknown')
-                display_cs = self.color_space_info.get('display_color_space', 'Unknown')
-                config_name = self.color_space_info.get('config_name', 'Unknown')
-                
-                color_space_text = f"Color Space: {asset_cs} → {display_cs}"
-                if config_name and config_name != "Unknown":
-                    color_space_text += f" ({config_name})"
-                
-                text_rect = painter.fontMetrics().boundingRect(color_space_text)
-                bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
-                bg_rect.moveTopLeft(QPoint(x_offset, y_offset))
-                
-                painter.fillRect(bg_rect, bg_color)
-                painter.setPen(QPen(highlight_color))
-                painter.drawText(x_offset, y_offset + text_rect.height(), color_space_text)
-                y_offset += line_height + 5
+                painter.setPen(QPen(pen_color))
+                painter.drawText(x_offset + padding, y_pos, line)
+                y_pos += line_height + spacing
             
             # Draw scene metrics (performance stats)
             if self.scene_metrics:
