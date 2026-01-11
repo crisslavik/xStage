@@ -2792,7 +2792,6 @@ class USDViewerWindow(QMainWindow):
             widget.setPalette(self.palette())
         self.addDockWidget(area, dock)
         return dock
-            self.viewport.update()
     
     def toggle_viewport_overlay(self, checked: bool):
         """Toggle viewport overlay visibility"""
