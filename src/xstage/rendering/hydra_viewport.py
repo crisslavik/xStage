@@ -215,6 +215,32 @@ class HydraViewportWidget(QOpenGLWidget):
         
         self.camera_target = Gf.Vec3d(center_scaled[0], center_scaled[1], center_scaled[2])
         self.camera_distance = size_scaled * 2.0
+        self.update()
+    
+    def frame_selected(self):
+        """Frame selected prim or all geometry (F key)"""
+        if not self.stage_manager:
+            return
+        
+        # Get geometry data from stage manager
+        geometry_data = self.stage_manager.get_geometry_data(self.current_time)
+        
+        # Frame all geometry bounds
+        if geometry_data and 'bounds' in geometry_data and geometry_data['bounds']:
+            self.frame_bounds(geometry_data['bounds'])
+        else:
+            # Fallback: frame to origin
+            self.camera_target = Gf.Vec3d(0.0, 0.0, 0.0)
+            self.camera_distance = 10.0
+            self.update()
+    
+    def go_home(self):
+        """Reset camera to initial/home position (H key)"""
+        self.camera_distance = self.home_camera_distance
+        self.camera_rotation_x = self.home_camera_rotation_x
+        self.camera_rotation_y = self.home_camera_rotation_y
+        self.camera_target = self.home_camera_target
+        self.update()
     
     def set_scene_scale(self, scale: float):
         """Set global scene scale"""
