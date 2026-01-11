@@ -1893,15 +1893,19 @@ class USDViewerWindow(QMainWindow):
             
             # Update viewport overlay with stats
             if hasattr(self, 'viewport_overlay') and self.viewport_overlay:
+                # Get active viewport (Hydra or OpenGL)
+                active_viewport = self.hydra_viewport if (self.use_hydra and self.hydra_viewport) else self.viewport
+                
                 stats = {
                     'meshes': len(geometry_data.get('meshes', [])),
                     'cameras': len(geometry_data.get('cameras', [])),
                     'lights': len(geometry_data.get('lights', [])),
                     'materials': len(geometry_data.get('materials', [])),
-                    'grid_enabled': self.viewport.settings.grid_enabled,
-                    'axis_enabled': self.viewport.settings.axis_enabled,
+                    'grid_enabled': active_viewport.settings.grid_enabled if hasattr(active_viewport, 'settings') else True,
+                    'axis_enabled': active_viewport.settings.axis_enabled if hasattr(active_viewport, 'settings') else True,
                 }
                 self.viewport_overlay.set_stats(stats)
+                self.viewport_overlay.update()  # Force update
                 
                 # Update camera info if available
                 if geometry_data.get('cameras'):
@@ -2758,9 +2762,12 @@ class USDViewerWindow(QMainWindow):
         palette = self.palette()
         for dock in self.findChildren(QDockWidget):
             dock.setPalette(palette)
-            # Also apply to the widget inside the dock
+            # Also apply to the widget inside the dock and all child widgets
             if dock.widget():
                 dock.widget().setPalette(palette)
+                # Recursively apply to all child widgets
+                for child in dock.widget().findChildren(QWidget):
+                    child.setPalette(palette)
     
     def _create_dock_with_theme(self, title: str, widget: QWidget, area: Qt.DockWidgetArea) -> QDockWidget:
         """Helper to create dock widget with theme applied"""
