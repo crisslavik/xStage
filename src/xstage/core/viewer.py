@@ -42,6 +42,13 @@ try:
     except AttributeError:
         USDLUX_COLORSPACEAPI_AVAILABLE = False
     
+    # Check if UsdRender.RenderSettings exists
+    try:
+        _ = UsdRender.RenderSettings
+        USDRENDER_RENDERSETTINGS_AVAILABLE = True
+    except AttributeError:
+        USDRENDER_RENDERSETTINGS_AVAILABLE = False
+    
     # Try to import UsdCollectionAPI separately as it may not be available in all USD versions
     try:
         from pxr import UsdCollectionAPI
@@ -64,6 +71,7 @@ except ImportError:
     USDLUX_LIGHTAPI_AVAILABLE = False
     USDLUX_COLORSPACEAPI_AVAILABLE = False
     USDCOLLECTIONAPI_AVAILABLE = False
+    USDRENDER_RENDERSETTINGS_AVAILABLE = False
     class UsdLux:
         pass
     class UsdCollectionAPI:
@@ -234,7 +242,7 @@ class USDStageManager:
                 if variant_data:
                     geometry_data['variants'].append(variant_data)
                     
-            elif USD_AVAILABLE and prim.IsA(UsdRender.RenderSettings):
+            elif USD_AVAILABLE and USDRENDER_RENDERSETTINGS_AVAILABLE and prim.IsA(UsdRender.RenderSettings):
                 render_data = self._extract_render_settings(prim, time_code)
                 if render_data:
                     geometry_data['render_settings'].append(render_data)
@@ -533,7 +541,7 @@ class USDStageManager:
     def _extract_render_settings(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:
         """Extract render settings"""
         try:
-            if not USD_AVAILABLE:
+            if not USD_AVAILABLE or not USDRENDER_RENDERSETTINGS_AVAILABLE:
                 return None
                 
             render_settings = UsdRender.RenderSettings(prim)
@@ -1759,7 +1767,7 @@ class USDViewerWindow(QMainWindow):
                 type_indicators.append("🎨")
             elif USD_AVAILABLE and prim.IsA(UsdSkel.Root):
                 type_indicators.append("🦴")
-            elif USD_AVAILABLE and prim.IsA(UsdRender.RenderSettings):
+            elif USD_AVAILABLE and USDRENDER_RENDERSETTINGS_AVAILABLE and prim.IsA(UsdRender.RenderSettings):
                 type_indicators.append("🎬")
             
             # Add variant indicator
