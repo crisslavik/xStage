@@ -92,6 +92,19 @@ if [ -f "$PYTHON_BIN" ]; then
         exit 1
     fi
     
+    # Verify shared library is available (required for USD build)
+    PYTHON_LIB_DIR="$PYTHON_DIR/lib"
+    if [ ! -f "$PYTHON_LIB_DIR/libpython3.11.so" ] && [ ! -f "$PYTHON_LIB_DIR/libpython3.11.so.1.0" ]; then
+        print_error "Python shared library (libpython3.11.so) not found!"
+        print_error "This Python was compiled without --enable-shared, which is required for USD build."
+        print_error "USD executables need to link against Python's shared library."
+        print_error ""
+        print_error "To fix this, you need to reinstall Python 3.11 with shared libraries:"
+        print_error "  1. Remove the existing Python: rm -rf $PYTHON_DIR"
+        print_error "  2. Re-run this install script (it will build Python with --enable-shared)"
+        exit 1
+    fi
+    
     USE_PYTHON="$PYTHON_BIN"
 elif check_python311; then
     print_status "Python 3.11 found in system: $PYTHON_VERSION"
@@ -120,6 +133,9 @@ else
         fi
         
         # Install Python 3.11 using pyenv
+        # IMPORTANT: Set PYTHON_CONFIGURE_OPTS to enable shared libraries
+        # This is required for USD build to link executables properly
+        export PYTHON_CONFIGURE_OPTS="--enable-shared"
         "$PYENV_ROOT/bin/pyenv" install 3.11.9 --skip-existing || "$PYENV_ROOT/bin/pyenv" install 3.11.9
         USE_PYTHON="$PYENV_ROOT/versions/3.11.9/bin/python3.11"
         
@@ -152,8 +168,11 @@ else
         cd "Python-${PYTHON_VERSION}"
         
         # Configure and compile
-        print_status "Configuring Python ${PYTHON_VERSION}..."
-        ./configure --prefix="$PYTHON_DIR" --enable-optimizations --with-ensurepip=install
+        # IMPORTANT: --enable-shared is required for USD build to link executables properly
+        # Without it, USD executables (sdfdump, sdffilter, etc.) will fail to link with
+        # undefined Python symbols
+        print_status "Configuring Python ${PYTHON_VERSION} (with shared libraries)..."
+        ./configure --prefix="$PYTHON_DIR" --enable-optimizations --enable-shared --with-ensurepip=install
         
         print_status "Compiling Python ${PYTHON_VERSION} (this will take several minutes)..."
         make -j$(nproc 2>/dev/null || echo 4)
@@ -201,6 +220,22 @@ else
         print_error "Please ensure libffi and libffi-devel are installed, then:"
         print_error "  1. Remove the Python installation: rm -rf $PYTHON_DIR"
         print_error "  2. Re-run this install script"
+        exit 1
+    fi
+    
+    # Verify shared library is available (required for USD build)
+    echo "Verifying Python shared library..."
+    PYTHON_LIB_DIR="$PYTHON_DIR/lib"
+    if [ -f "$PYTHON_LIB_DIR/libpython3.11.so" ] || [ -f "$PYTHON_LIB_DIR/libpython3.11.so.1.0" ]; then
+        print_status "Python shared library OK"
+    else
+        print_error "Python shared library (libpython3.11.so) not found!"
+        print_error "This usually means Python was compiled without --enable-shared."
+        print_error "USD build requires Python shared libraries to link executables."
+        print_error ""
+        print_error "Please rebuild Python with shared libraries:"
+        print_error "  1. Remove the Python installation: rm -rf $PYTHON_DIR"
+        print_error "  2. Re-run this install script (it will build Python with --enable-shared)"
         exit 1
     fi
 fi
@@ -487,7 +522,10 @@ if [ "$BUILD_USD" = true ]; then
         print_error "Common issues:"
         print_error "  - Missing build dependencies (check that all required packages are installed)"
         print_error "  - Missing jinja2 (required for schema generation) - should be installed automatically"
-        print_error "  - Python linking errors (undefined Python symbols) - may need to rebuild Python with shared libraries"
+        print_error "  - Python linking errors (undefined Python symbols like _Py_Dealloc, PyNumber_InPlaceRemainder):"
+        print_error "    This means Python was built without shared libraries (--enable-shared)."
+        print_error "    To fix: rm -rf $PYTHON_DIR && ./scripts/install.sh"
+        print_error "    The script will rebuild Python with --enable-shared automatically."
         print_error "  - Insufficient disk space (USD build requires ~5GB)"
         print_error "  - Network issues downloading dependencies"
         print_error "  - Compiler compatibility issues (try with fewer parallel jobs: -j 4)"
