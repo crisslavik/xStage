@@ -290,21 +290,26 @@ echo "Installing Python dependencies (all self-contained in xStage)..."
 echo "This may take several minutes as USD is a large package..."
 echo ""
 echo "Installing core dependencies:"
-echo "  - USD 25.11+ (usd-core)"
+echo "  - USD 25.11+ (will be built from source with imaging support)"
 echo "  - OCIO 2.2+ (PyOpenColorIO)"
 echo "  - QuiltiX (MaterialX editor)"
 echo "  - All other dependencies from requirements.txt"
 echo ""
 
-# Install requirements (this will install USD 25.11, OCIO 2.2, QuiltiX automatically)
+# Create temporary requirements without usd-core (we'll build USD from source)
+TEMP_REQUIREMENTS=$(mktemp)
+grep -v "^usd-core" requirements.txt > "$TEMP_REQUIREMENTS"
+
+# Install requirements (this will install OCIO 2.2, QuiltiX automatically, but NOT usd-core)
 # Note: PyOpenColorIO may not be available for all Python versions/platforms - it's optional
 if [ -f "requirements.txt" ]; then
     # Try to install all requirements, but don't fail if PyOpenColorIO is missing
     PIP_OUTPUT=$(mktemp)
     set +e  # Temporarily disable exit on error
-    pip install --no-cache-dir -r requirements.txt 2>&1 | tee "$PIP_OUTPUT"
+    pip install --no-cache-dir -r "$TEMP_REQUIREMENTS" 2>&1 | tee "$PIP_OUTPUT"
     PIP_EXIT_CODE=${PIPESTATUS[0]}
     set -e  # Re-enable exit on error
+    rm -f "$TEMP_REQUIREMENTS"
     
     if [ $PIP_EXIT_CODE -eq 0 ]; then
         print_status "All Python dependencies installed (self-contained)"
