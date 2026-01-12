@@ -1549,6 +1549,14 @@ class USDViewerWindow(QMainWindow):
                 # UsdImagingGL not available or failed to initialize, use OpenGL fallback
                 print(f"Hydra 2.0 viewport is not available: {e}")
                 print("Using OpenGL fallback")
+                print()
+                print("NOTE: The 'usd-core' package from PyPI doesn't include UsdImagingGL.")
+                print("      xStage will use OpenGL fallback rendering, which works for basic")
+                print("      viewing but lacks advanced features (materials, lighting, etc.).")
+                print()
+                print("      For full USD rendering support, install a complete USD build with")
+                print("      imaging support. See docs/USD_RENDERING_EXPLANATION.md for details.")
+                print()
                 self.hydra_viewport = None
                 viewport_layout.addWidget(self.viewport)
                 self.use_hydra = False
