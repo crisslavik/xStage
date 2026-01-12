@@ -1021,8 +1021,13 @@ class ViewportWidget(QOpenGLWidget):
         fvi = mesh.get('face_vertex_indices')
         normals = mesh.get('normals')
         
-        if not points or not fvc or not fvi:
-            return  # Skip invalid meshes
+        # Check if arrays exist and have data (handle numpy arrays properly)
+        if points is None or len(points) == 0:
+            return
+        if fvc is None or len(fvc) == 0:
+            return
+        if fvi is None or len(fvi) == 0:
+            return
         
         # Apply transform
         glPushMatrix()
