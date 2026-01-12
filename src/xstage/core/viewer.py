@@ -2636,6 +2636,37 @@ class USDViewerWindow(QMainWindow):
         # Could switch viewport to use this camera
         self.statusBar().showMessage(f"Selected camera: {camera_path}", 2000)
     
+    def on_viewport_camera_changed(self, camera_path: str):
+        """Handle viewport camera change from header"""
+        active_viewport = self.hydra_viewport if (self.use_hydra and self.hydra_viewport) else self.viewport
+        
+        if camera_path == "Perspective":
+            # Use free camera
+            active_viewport.current_usd_camera = None
+            if hasattr(active_viewport, 'view_mode'):
+                active_viewport.view_mode = "Perspective"
+        else:
+            # Use USD camera
+            if USD_AVAILABLE and self.stage_manager.stage:
+                prim = self.stage_manager.stage.GetPrimAtPath(camera_path)
+                if prim and prim.IsA(UsdGeom.Camera):
+                    active_viewport.current_usd_camera = prim
+                    if hasattr(active_viewport, 'view_mode'):
+                        active_viewport.view_mode = "Perspective"  # USD cameras are perspective
+                    # TODO: Extract camera transform and apply to viewport
+                    self.statusBar().showMessage(f"Using camera: {prim.GetName()}", 2000)
+        
+        active_viewport.update()
+    
+    def on_viewport_view_changed(self, view_name: str):
+        """Handle viewport view change from header (Top, Front, etc.)"""
+        active_viewport = self.hydra_viewport if (self.use_hydra and self.hydra_viewport) else self.viewport
+        
+        if hasattr(active_viewport, 'view_mode'):
+            active_viewport.view_mode = view_name
+            active_viewport.current_usd_camera = None  # Ortho views don't use USD cameras
+            active_viewport.update()
+    
     def show_multi_viewport(self):
         """Show multi-viewport widget"""
         if not self.multi_viewport_widget:
