@@ -1212,6 +1212,7 @@ class USDViewerWindow(QMainWindow):
         self.viewport_header = ViewportHeader()
         self.viewport_header.camera_changed.connect(self.on_viewport_camera_changed)
         self.viewport_header.view_changed.connect(self.on_viewport_view_changed)
+        self.viewport_header.overlay_toggled.connect(self.on_viewport_overlay_toggled)
         viewport_layout.addWidget(self.viewport_header)
         
         # Create central widget with viewport

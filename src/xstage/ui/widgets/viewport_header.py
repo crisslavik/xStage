@@ -4,7 +4,7 @@ Professional viewport controls like Omniverse (camera selector, view buttons)
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QComboBox, QPushButton, QButtonGroup, QLabel
+    QWidget, QHBoxLayout, QComboBox, QPushButton, QButtonGroup, QLabel, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
@@ -24,6 +24,7 @@ class ViewportHeader(QWidget):
     # Signals
     camera_changed = Signal(str)  # Emits camera path or "Perspective"
     view_changed = Signal(str)  # Emits view name: "Perspective", "Top", "Front", etc.
+    overlay_toggled = Signal(bool)  # Emits overlay visibility state
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,6 +32,7 @@ class ViewportHeader(QWidget):
         self.current_camera = "Perspective"
         self.current_view = "Perspective"
         self.cameras = []  # List of USD camera prims
+        self.overlay_visible = True  # Default: overlay visible
         
         self.init_ui()
     
@@ -120,6 +122,39 @@ class ViewportHeader(QWidget):
         if self.view_button_group.buttons():
             self.view_button_group.buttons()[0].setChecked(True)
         
+        layout.addSpacing(20)
+        
+        # Overlay toggle (show/hide FPS, stats, etc.)
+        overlay_label = QLabel("Info:")
+        overlay_label.setStyleSheet("color: palette(window-text); font-weight: bold;")
+        layout.addWidget(overlay_label)
+        
+        self.overlay_checkbox = QCheckBox("Show Info")
+        self.overlay_checkbox.setChecked(True)  # Default: visible
+        self.overlay_checkbox.setToolTip("Toggle viewport overlay information (FPS, stats, etc.)")
+        self.overlay_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: palette(window-text);
+                spacing: 5px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border: 1px solid palette(mid);
+                border-radius: 3px;
+                background-color: palette(base);
+            }
+            QCheckBox::indicator:checked {
+                background-color: palette(highlight);
+                border: 1px solid palette(highlight);
+            }
+            QCheckBox::indicator:hover {
+                border: 1px solid palette(highlight);
+            }
+        """)
+        self.overlay_checkbox.toggled.connect(self.on_overlay_toggled)
+        layout.addWidget(self.overlay_checkbox)
+        
         layout.addStretch()
         
         self.setLayout(layout)
@@ -179,3 +214,13 @@ class ViewportHeader(QWidget):
             if btn.text() == view_name:
                 btn.setChecked(True)
                 break
+    
+    def on_overlay_toggled(self, checked: bool):
+        """Handle overlay visibility toggle"""
+        self.overlay_visible = checked
+        self.overlay_toggled.emit(checked)
+    
+    def set_overlay_visible(self, visible: bool):
+        """Programmatically set overlay visibility"""
+        self.overlay_checkbox.setChecked(visible)
+        self.overlay_visible = visible
