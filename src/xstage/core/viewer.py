@@ -714,6 +714,13 @@ class ViewportWidget(QOpenGLWidget):
         self.last_mouse_pos = None
         self.is_rotating = False
         self.is_panning = False
+        self.is_gizmo_dragging = False
+        
+        # Gizmo
+        from ..rendering.gizmo import TransformGizmo, GizmoMode, GizmoAxis
+        self.gizmo = TransformGizmo()
+        self.gizmo_mode = GizmoMode.TRANSLATE
+        self.GizmoAxis = GizmoAxis  # Store for use in drawing methods
         
         # Enable keyboard focus for shortcuts
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -1012,6 +1019,51 @@ class ViewportWidget(QOpenGLWidget):
             idx += count
             
         glPopMatrix()
+    
+    def draw_gizmo(self):
+        """Draw transform gizmo for selected prim"""
+        # Get selected prim from viewer window
+        if not hasattr(self, 'parent') or not self.parent():
+            return
+        
+        viewer_window = self.parent()
+        while viewer_window and not isinstance(viewer_window, USDViewerWindow):
+            viewer_window = viewer_window.parent()
+        
+        if not viewer_window or not hasattr(viewer_window, 'prim_selection_manager'):
+            return
+        
+        selection_manager = viewer_window.prim_selection_manager
+        if not selection_manager:
+            return
+        
+        selected_prims = selection_manager.get_selected_prims()
+        if not selected_prims:
+            return
+        
+        # Use first selected prim
+        selected_prim = selected_prims[0]
+        
+        # Get prim transform
+        if not USD_AVAILABLE:
+            return
+        
+        try:
+            from pxr import UsdGeom
+            if selected_prim.IsA(UsdGeom.Xformable):
+                xformable = UsdGeom.Xformable(selected_prim)
+                transform = xformable.ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+                position = transform.ExtractTranslation()
+                
+                # Set gizmo position and size
+                self.gizmo.set_position(np.array([position[0], position[1], position[2]]))
+                self.gizmo.set_size(self.camera_distance * 0.1)  # Scale with camera distance
+                self.gizmo.set_mode(self.gizmo_mode)
+                
+                # Draw gizmo using direct OpenGL calls
+                self._draw_gizmo_opengl()
+        except Exception as e:
+            print(f"Error drawing gizmo: {e}")
         
     def mousePressEvent(self, event):
         """Handle mouse press"""
@@ -1024,6 +1076,10 @@ class ViewportWidget(QOpenGLWidget):
             
     def mouseReleaseEvent(self, event):
         """Handle mouse release"""
+        if self.is_gizmo_dragging:
+            self.gizmo.end_drag()
+            self.is_gizmo_dragging = False
+        
         self.is_rotating = False
         self.is_panning = False
         
@@ -1033,10 +1089,52 @@ class ViewportWidget(QOpenGLWidget):
             return
             
         pos = event.position()
+        mouse_pos = (pos.x(), pos.y())
         dx = pos.x() - self.last_mouse_pos.x()
         dy = pos.y() - self.last_mouse_pos.y()
         
-        if self.is_rotating:
+        if self.is_gizmo_dragging:
+            # Update gizmo drag
+            camera_pos = self._get_camera_position()
+            camera_target = self.camera_target
+            view_direction = self._get_view_direction()
+            
+            # Get transform delta from gizmo
+            transform_delta = self.gizmo.update_drag(
+                mouse_pos, camera_pos, camera_target, view_direction,
+                None, None, (self.width(), self.height())
+            )
+            
+            if transform_delta is not None:
+                # Apply transform to selected prim
+                if hasattr(self, 'parent'):
+                    viewer_window = self.parent()
+                    while viewer_window and not isinstance(viewer_window, USDViewerWindow):
+                        viewer_window = viewer_window.parent()
+                    
+                    if viewer_window and hasattr(viewer_window, 'prim_selection_manager'):
+                        selection_manager = viewer_window.prim_selection_manager
+                        if selection_manager:
+                            selected_prims = selection_manager.get_selected_prims()
+                            if selected_prims:
+                                selected_prim = selected_prims[0]
+                                
+                                if self.gizmo_mode.value == "translate":
+                                    # Apply translation
+                                    current_pos = self.gizmo.position
+                                    new_pos = current_pos + transform_delta
+                                    selection_manager.translate_prim(
+                                        selected_prim,
+                                        Gf.Vec3d(new_pos[0], new_pos[1], new_pos[2])
+                                    )
+                                    self.gizmo.set_position(new_pos)
+                                elif self.gizmo_mode.value == "scale":
+                                    # Apply scale (would need current scale to multiply)
+                                    pass  # TODO: Implement scale
+                                
+                                self.update()
+            
+        elif self.is_rotating:
             self.camera_rotation_y += dx * 0.5
             self.camera_rotation_x = np.clip(self.camera_rotation_x + dy * 0.5, -89, 89)
             self.update()
@@ -1053,6 +1151,31 @@ class ViewportWidget(QOpenGLWidget):
             self.update()
             
         self.last_mouse_pos = pos
+    
+    def _get_camera_position(self) -> np.ndarray:
+        """Get current camera position"""
+        cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+        cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+        cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+        return self.camera_target + np.array([cam_x, cam_y, cam_z])
+    
+    def _get_view_direction(self) -> np.ndarray:
+        """Get view direction vector"""
+        camera_pos = self._get_camera_position()
+        view_dir = self.camera_target - camera_pos
+        return view_dir / np.linalg.norm(view_dir)
+    
+    def _world_to_screen(self, world_pos: np.ndarray, camera_pos: np.ndarray) -> Tuple[float, float]:
+        """Convert world position to screen coordinates (simplified)"""
+        # This is a simplified version - proper implementation would use projection matrix
+        to_point = world_pos - camera_pos
+        distance = np.linalg.norm(to_point)
+        
+        # Simple approximation
+        screen_x = self.width() / 2
+        screen_y = self.height() / 2
+        
+        return (screen_x, screen_y)
     
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts for viewport navigation"""
