@@ -544,8 +544,15 @@ if [ "$BUILD_USD" = true ]; then
     # --usd-imaging enables BOTH Imaging library AND UsdImaging (which provides UsdImagingGL)
     # This is what we need for Hydra rendering in xStage
     # 
-    # The optional imaging features (Ptex, OpenVDB, ImageIO, OpenImageIO, OCIO, Embree, PRMan, Vulkan)
-    # are disabled by default and not needed for basic Hydra rendering with Storm
+    # Enable optional imaging features for better USD support:
+    # - --openimageio: Better image format support (JPEG, PNG, EXR, etc.)
+    # - --opencolorio: Color management support (OCIO configs)
+    # - --embree: Better ray tracing performance
+    # - --ptex: Ptex texture support (may require additional dependencies)
+    # - --openvdb: OpenVDB volume support (may require additional dependencies)
+    # 
+    # Note: Some features may require additional system packages. If the build fails,
+    # you can remove specific flags (e.g., --ptex, --openvdb) and rebuild.
     # 
     # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
     # Use -j flag to limit parallel jobs and avoid resource exhaustion
@@ -554,6 +561,11 @@ if [ "$BUILD_USD" = true ]; then
         --usd-imaging \
         --python \
         --onetbb \
+        --openimageio \
+        --opencolorio \
+        --embree \
+        --ptex \
+        --openvdb \
         --no-examples \
         --no-tutorials \
         --no-tests \
@@ -580,7 +592,11 @@ if [ "$BUILD_USD" = true ]; then
         print_error "    This means Python was built without shared libraries (--enable-shared)."
         print_error "    To fix: rm -rf $PYTHON_DIR && ./scripts/install.sh"
         print_error "    The script will rebuild Python with --enable-shared automatically."
-        print_error "  - Insufficient disk space (USD build requires ~5GB)"
+        print_error "  - Optional feature build failures (OpenImageIO, OCIO, Embree, Ptex, OpenVDB):"
+        print_error "    If specific optional features fail to build, you can edit install.sh and remove"
+        print_error "    the corresponding flags (--openimageio, --opencolorio, --embree, --ptex, --openvdb)."
+        print_error "    Core USD imaging will still work without these optional features."
+        print_error "  - Insufficient disk space (USD build with all features requires ~8-10GB)"
         print_error "  - Network issues downloading dependencies"
         print_error "  - Compiler compatibility issues (try with fewer parallel jobs: -j 4)"
         print_error "  - TBB version incompatibility (using bundled TBB with --onetbb)"
