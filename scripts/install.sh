@@ -535,6 +535,43 @@ if [ "$BUILD_USD" = true ]; then
     fi
     print_status "Using $PARALLEL_JOBS parallel build jobs"
     
+    # Check for Vulkan SDK (required for --vulkan flag)
+    VULKAN_ENABLED=false
+    if [ -n "$VULKAN_SDK" ]; then
+        if [ -d "$VULKAN_SDK" ] && [ -f "$VULKAN_SDK/include/vulkan/vulkan.h" ]; then
+            VULKAN_ENABLED=true
+            print_status "Vulkan SDK found at: $VULKAN_SDK"
+        else
+            print_warning "VULKAN_SDK is set but directory is invalid: $VULKAN_SDK"
+        fi
+    else
+        # Check common Vulkan SDK installation locations
+        VULKAN_PATHS=(
+            "$HOME/VulkanSDK"
+            "$HOME/vulkan"
+            "/usr/local/vulkan"
+            "/opt/vulkan"
+            "/usr/share/vulkan"
+        )
+        
+        for VULKAN_PATH in "${VULKAN_PATHS[@]}"; do
+            if [ -d "$VULKAN_PATH" ] && [ -f "$VULKAN_PATH/include/vulkan/vulkan.h" ]; then
+                export VULKAN_SDK="$VULKAN_PATH"
+                VULKAN_ENABLED=true
+                print_status "Vulkan SDK found at: $VULKAN_SDK"
+                break
+            fi
+        done
+    fi
+    
+    if [ "$VULKAN_ENABLED" = false ]; then
+        print_warning "Vulkan SDK not found. Vulkan support will be disabled."
+        print_warning "To enable Vulkan:"
+        print_warning "  1. Install Vulkan SDK from https://vulkan.lunarg.com/"
+        print_warning "  2. Set VULKAN_SDK environment variable to the SDK path"
+        print_warning "  3. Re-run this script"
+    fi
+    
     # Build USD with all imaging components
     # Note: We disable MaterialX (it's optional and requires Xt which causes build issues)
     # MaterialX is nice to have but not required for basic USD rendering
@@ -550,31 +587,42 @@ if [ "$BUILD_USD" = true ]; then
     # - --embree: Better ray tracing performance
     # - --ptex: Ptex texture support (may require additional dependencies)
     # - --openvdb: OpenVDB volume support (may require additional dependencies)
-    # - --vulkan: Vulkan rendering support (useful on Linux for GPU acceleration)
+    # - --vulkan: Vulkan rendering support (requires VULKAN_SDK environment variable)
     # 
     # Note: Some features may require additional system packages. If the build fails,
     # you can remove specific flags (e.g., --ptex, --openvdb, --vulkan) and rebuild.
     # 
     # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
     # Use -j flag to limit parallel jobs and avoid resource exhaustion
-    "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
-        --build "$USD_BUILD_DIR/build" \
-        --usd-imaging \
-        --python \
-        --onetbb \
-        --openimageio \
-        --opencolorio \
-        --embree \
-        --ptex \
-        --openvdb \
-        --vulkan \
-        --no-examples \
-        --no-tutorials \
-        --no-tests \
-        --no-docs \
-        --no-materialx \
-        -j "$PARALLEL_JOBS" \
+    
+    # Build command with conditional Vulkan flag
+    BUILD_CMD=(
+        "$PYTHON_FOR_BUILD" build_scripts/build_usd.py
+        --build "$USD_BUILD_DIR/build"
+        --usd-imaging
+        --python
+        --onetbb
+        --openimageio
+        --opencolorio
+        --embree
+        --ptex
+        --openvdb
+        --no-examples
+        --no-tutorials
+        --no-tests
+        --no-docs
+        --no-materialx
+        -j "$PARALLEL_JOBS"
         "$USD_INSTALL_DIR"
+    )
+    
+    # Add --vulkan flag only if Vulkan SDK is available
+    if [ "$VULKAN_ENABLED" = true ]; then
+        BUILD_CMD+=(--vulkan)
+    fi
+    
+    # Execute the build command
+    "${BUILD_CMD[@]}"
     
     BUILD_EXIT_CODE=$?
     if [ $BUILD_EXIT_CODE -eq 0 ]; then
@@ -598,7 +646,8 @@ if [ "$BUILD_USD" = true ]; then
         print_error "    If specific optional features fail to build, you can edit install.sh and remove"
         print_error "    the corresponding flags (--openimageio, --opencolorio, --embree, --ptex, --openvdb, --vulkan)."
         print_error "    Core USD imaging will still work without these optional features."
-        print_error "    Note: Vulkan requires Vulkan SDK and drivers. If missing, remove --vulkan flag."
+        print_error "    Note: Vulkan requires VULKAN_SDK environment variable. The script automatically"
+        print_error "    detects Vulkan SDK if installed, or disables Vulkan support if not found."
         print_error "  - Insufficient disk space (USD build with all features requires ~8-10GB)"
         print_error "  - Network issues downloading dependencies"
         print_error "  - Compiler compatibility issues (try with fewer parallel jobs: -j 4)"
