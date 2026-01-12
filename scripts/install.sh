@@ -550,9 +550,10 @@ if [ "$BUILD_USD" = true ]; then
     # - --embree: Better ray tracing performance
     # - --ptex: Ptex texture support (may require additional dependencies)
     # - --openvdb: OpenVDB volume support (may require additional dependencies)
+    # - --vulkan: Vulkan rendering support (useful on Linux for GPU acceleration)
     # 
     # Note: Some features may require additional system packages. If the build fails,
-    # you can remove specific flags (e.g., --ptex, --openvdb) and rebuild.
+    # you can remove specific flags (e.g., --ptex, --openvdb, --vulkan) and rebuild.
     # 
     # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
     # Use -j flag to limit parallel jobs and avoid resource exhaustion
@@ -566,6 +567,7 @@ if [ "$BUILD_USD" = true ]; then
         --embree \
         --ptex \
         --openvdb \
+        --vulkan \
         --no-examples \
         --no-tutorials \
         --no-tests \
@@ -592,10 +594,11 @@ if [ "$BUILD_USD" = true ]; then
         print_error "    This means Python was built without shared libraries (--enable-shared)."
         print_error "    To fix: rm -rf $PYTHON_DIR && ./scripts/install.sh"
         print_error "    The script will rebuild Python with --enable-shared automatically."
-        print_error "  - Optional feature build failures (OpenImageIO, OCIO, Embree, Ptex, OpenVDB):"
+        print_error "  - Optional feature build failures (OpenImageIO, OCIO, Embree, Ptex, OpenVDB, Vulkan):"
         print_error "    If specific optional features fail to build, you can edit install.sh and remove"
-        print_error "    the corresponding flags (--openimageio, --opencolorio, --embree, --ptex, --openvdb)."
+        print_error "    the corresponding flags (--openimageio, --opencolorio, --embree, --ptex, --openvdb, --vulkan)."
         print_error "    Core USD imaging will still work without these optional features."
+        print_error "    Note: Vulkan requires Vulkan SDK and drivers. If missing, remove --vulkan flag."
         print_error "  - Insufficient disk space (USD build with all features requires ~8-10GB)"
         print_error "  - Network issues downloading dependencies"
         print_error "  - Compiler compatibility issues (try with fewer parallel jobs: -j 4)"
