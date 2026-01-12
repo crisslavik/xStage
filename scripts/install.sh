@@ -419,8 +419,9 @@ if [ "$BUILD_USD" = true ]; then
     PYTHON_FOR_BUILD="$VENV_DIR/bin/python3"
     
     # Build USD with all imaging components
-    # Note: We disable MaterialX if Xt is not available (it's optional)
+    # Note: We disable MaterialX (it's optional and requires Xt which causes build issues)
     # MaterialX is nice to have but not required for basic USD rendering
+    # Imaging support (UsdImagingGL) is what we need for viewport rendering
     "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
         --build "$USD_BUILD_DIR/build" \
         --imaging \
