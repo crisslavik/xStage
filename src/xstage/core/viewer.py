@@ -801,24 +801,63 @@ class ViewportWidget(QOpenGLWidget):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         aspect = self.width() / max(self.height(), 1)
-        gluPerspective(self.settings.camera_fov, aspect, 
-                      self.settings.near_clip, self.settings.far_clip)
+        
+        # Use orthographic for ortho views, perspective for perspective view
+        view_mode = getattr(self, 'view_mode', 'Perspective')
+        if view_mode == "Perspective":
+            gluPerspective(self.settings.camera_fov, aspect, 
+                          self.settings.near_clip, self.settings.far_clip)
+        else:
+            # Orthographic projection for ortho views
+            ortho_size = self.camera_distance * 0.5
+            glOrtho(-ortho_size * aspect, ortho_size * aspect,
+                   -ortho_size, ortho_size,
+                   self.settings.near_clip, self.settings.far_clip)
         
         # Set up camera
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         
-        # Calculate camera position from rotation
-        cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-        cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-        cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-        
-        camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
+        # Calculate camera position and orientation based on view mode
+        if view_mode == "Perspective":
+            # Free camera (perspective)
+            cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+            cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
+            up_vector = np.array([0, 1, 0])
+        elif view_mode == "Top":
+            # Top view: camera above, looking down
+            camera_pos = self.camera_target + np.array([0, self.camera_distance, 0])
+            up_vector = np.array([0, 0, -1])  # Negative Z is "up" in top view
+        elif view_mode == "Front":
+            # Front view: camera in front, looking back
+            camera_pos = self.camera_target + np.array([0, 0, self.camera_distance])
+            up_vector = np.array([0, 1, 0])
+        elif view_mode == "Left":
+            # Left view: camera on left, looking right
+            camera_pos = self.camera_target + np.array([-self.camera_distance, 0, 0])
+            up_vector = np.array([0, 1, 0])
+        elif view_mode == "Back":
+            # Back view: camera behind, looking forward
+            camera_pos = self.camera_target + np.array([0, 0, -self.camera_distance])
+            up_vector = np.array([0, 1, 0])
+        elif view_mode == "Right":
+            # Right view: camera on right, looking left
+            camera_pos = self.camera_target + np.array([self.camera_distance, 0, 0])
+            up_vector = np.array([0, 1, 0])
+        else:
+            # Default to perspective
+            cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+            cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
+            up_vector = np.array([0, 1, 0])
         
         gluLookAt(
             camera_pos[0], camera_pos[1], camera_pos[2],
             self.camera_target[0], self.camera_target[1], self.camera_target[2],
-            0, 1, 0
+            up_vector[0], up_vector[1], up_vector[2]
         )
         
         # Draw grid
