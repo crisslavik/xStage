@@ -13,11 +13,14 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 try:
     from pxr import Usd, UsdGeom, Gf, UsdImagingGL, Glf, CameraUtil
     USD_AVAILABLE = True
+    # Check if Orthographic is available (may not be in all USD versions)
+    ORTHOGRAPHIC_AVAILABLE = hasattr(CameraUtil, 'Orthographic')
 except ImportError:
     USD_AVAILABLE = False
     UsdImagingGL = None
     Glf = None
     CameraUtil = None
+    ORTHOGRAPHIC_AVAILABLE = False
 
 
 class HydraViewportWidget(QOpenGLWidget):
