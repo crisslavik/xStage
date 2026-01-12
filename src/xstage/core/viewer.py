@@ -733,13 +733,22 @@ class ViewportWidget(QOpenGLWidget):
         """Update geometry for current time"""
         if self.stage_manager:
             self.geometry_data = self.stage_manager.get_geometry_data(time_code)
+            print(f"DEBUG: update_geometry called. Meshes: {len(self.geometry_data.get('meshes', []))}, "
+                  f"Cameras: {len(self.geometry_data.get('cameras', []))}, "
+                  f"Lights: {len(self.geometry_data.get('lights', []))}")
             
             # Auto-frame on first load
             if self.settings.auto_frame and 'bounds' in self.geometry_data and self.geometry_data['bounds']:
+                bounds = self.geometry_data['bounds']
+                print(f"DEBUG: Auto-framing to bounds: center={bounds.get('center')}, size={bounds.get('size')}")
                 self.frame_bounds(self.geometry_data['bounds'])
                 self.settings.auto_frame = False
+            else:
+                print(f"DEBUG: Not auto-framing. auto_frame={self.settings.auto_frame}, "
+                      f"has_bounds={'bounds' in self.geometry_data}")
                 
             self.update()
+            print(f"DEBUG: Viewport update() called")
     
     def frame_bounds(self, bounds: Dict):
         """Frame camera to fit bounds"""
@@ -953,11 +962,19 @@ class ViewportWidget(QOpenGLWidget):
     def draw_geometry(self):
         """Draw USD geometry"""
         if not self.geometry_data or 'meshes' not in self.geometry_data:
+            # Debug: print if geometry data is missing
+            if not self.geometry_data:
+                print("DEBUG: No geometry_data in viewport")
+            elif 'meshes' not in self.geometry_data:
+                print(f"DEBUG: geometry_data missing 'meshes' key. Keys: {list(self.geometry_data.keys())}")
             return
         
         if not self.geometry_data['meshes']:
             # No meshes to draw
+            print(f"DEBUG: geometry_data['meshes'] is empty. Total meshes: {len(self.geometry_data.get('meshes', []))}")
             return
+        
+        print(f"DEBUG: Drawing {len(self.geometry_data['meshes'])} meshes")
         
         glEnable(GL_LIGHTING)
         glEnable(GL_DEPTH_TEST)
@@ -2121,11 +2138,17 @@ class USDViewerWindow(QMainWindow):
             self.fps_spinbox.setValue(int(self.stage_manager.fps))
             
             # Update viewport
+            print(f"DEBUG: Loading USD file. use_hydra={self.use_hydra}, has_hydra_viewport={bool(self.hydra_viewport)}")
             if self.use_hydra and self.hydra_viewport:
+                print("DEBUG: Using Hydra viewport")
                 self.hydra_viewport.set_stage(self.stage_manager.stage)
                 self.hydra_viewport.update_geometry(float(start))
             else:
+                print("DEBUG: Using OpenGL viewport")
                 self.viewport.update_geometry(float(start))
+                # Force a repaint
+                self.viewport.update()
+                QApplication.processEvents()  # Process events to ensure update happens
             
             # Update hierarchy
             self.update_hierarchy()
