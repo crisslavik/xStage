@@ -2139,12 +2139,23 @@ class USDViewerWindow(QMainWindow):
             
             # Update viewport
             print(f"DEBUG: Loading USD file. use_hydra={self.use_hydra}, has_hydra_viewport={bool(self.hydra_viewport)}")
+            print(f"DEBUG: Stage loaded: {self.stage_manager.stage is not None}")
+            print(f"DEBUG: Current time: {self.stage_manager.current_time}")
+            
+            # Ensure viewport has stage_manager set
+            if not self.viewport.stage_manager:
+                print("DEBUG: Setting stage_manager on viewport")
+                self.viewport.set_stage_manager(self.stage_manager)
+            
             if self.use_hydra and self.hydra_viewport:
                 print("DEBUG: Using Hydra viewport")
+                if not self.hydra_viewport.stage_manager:
+                    self.hydra_viewport.set_stage_manager(self.stage_manager)
                 self.hydra_viewport.set_stage(self.stage_manager.stage)
                 self.hydra_viewport.update_geometry(float(start))
             else:
                 print("DEBUG: Using OpenGL viewport")
+                print(f"DEBUG: Viewport stage_manager: {self.viewport.stage_manager is not None}")
                 self.viewport.update_geometry(float(start))
                 # Force a repaint
                 self.viewport.update()

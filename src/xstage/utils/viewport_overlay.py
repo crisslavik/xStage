@@ -5,7 +5,7 @@ FPS counter, statistics, and information overlays
 
 from typing import Dict, Optional
 from PySide6.QtWidgets import QWidget, QLabel
-from PySide6.QtCore import Qt, QTimer, QPoint
+from PySide6.QtCore import Qt, QTimer, QPoint, QRect
 from PySide6.QtGui import QPainter, QFont, QColor, QPen
 import time
 
