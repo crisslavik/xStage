@@ -205,13 +205,14 @@ else
     fi
 fi
 
-# Install system dependencies (needed for Python 3.11 compilation and USD)
+# Install system dependencies (needed for Python 3.11 compilation and USD build)
 echo ""
 echo "Installing system dependencies..."
 PACKAGES=(
     "gcc"
     "gcc-c++"
     "make"
+    "cmake"
     "openssl-devel"
     "bzip2-devel"
     "readline-devel"
@@ -229,6 +230,14 @@ PACKAGES=(
     "libXinerama-devel"
     "qt6-qtbase-devel"
     "git"
+    "python3-devel"
+    "boost-devel"
+    "tbb-devel"
+    "libxml2-devel"
+    "pkgconfig"
+    "flex"
+    "bison"
+    "libtool"
 )
 
 MISSING_PACKAGES=()
