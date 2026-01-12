@@ -2668,6 +2668,13 @@ class USDViewerWindow(QMainWindow):
             active_viewport.current_usd_camera = None  # Ortho views don't use USD cameras
             active_viewport.update()
     
+    def on_viewport_overlay_toggled(self, visible: bool):
+        """Handle viewport overlay visibility toggle from header"""
+        if hasattr(self, 'viewport_overlay') and self.viewport_overlay:
+            self.viewport_overlay.setVisible(visible)
+            if visible:
+                self.viewport_overlay.update()  # Force update when shown
+    
     def show_multi_viewport(self):
         """Show multi-viewport widget"""
         if not self.multi_viewport_widget:
