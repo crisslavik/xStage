@@ -238,6 +238,9 @@ PACKAGES=(
     "flex"
     "bison"
     "libtool"
+    "libXt-devel"  # X Toolkit Intrinsics (needed for MaterialX)
+    "libX11-devel"
+    "libXext-devel"
 )
 
 MISSING_PACKAGES=()
@@ -416,6 +419,8 @@ if [ "$BUILD_USD" = true ]; then
     PYTHON_FOR_BUILD="$VENV_DIR/bin/python3"
     
     # Build USD with all imaging components
+    # Note: We disable MaterialX if Xt is not available (it's optional)
+    # MaterialX is nice to have but not required for basic USD rendering
     "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
         --build "$USD_BUILD_DIR/build" \
         --imaging \
@@ -424,6 +429,7 @@ if [ "$BUILD_USD" = true ]; then
         --no-tutorials \
         --no-tests \
         --no-docs \
+        --no-materialx \
         "$USD_INSTALL_DIR"
     
     if [ $? -eq 0 ]; then
