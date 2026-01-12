@@ -430,10 +430,13 @@ if [ "$BUILD_USD" = true ]; then
     # 
     # The optional imaging features (Ptex, OpenVDB, ImageIO, OpenImageIO, OCIO, Embree, PRMan, Vulkan)
     # are disabled by default and not needed for basic Hydra rendering with Storm
+    # 
+    # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
     "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
         --build "$USD_BUILD_DIR/build" \
         --usd-imaging \
         --python \
+        --onetbb \
         --no-examples \
         --no-tutorials \
         --no-tests \
