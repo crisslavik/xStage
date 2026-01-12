@@ -584,7 +584,12 @@ if [ "$BUILD_USD" = true ]; then
     # Enable optional imaging features for better USD support:
     # - --openimageio: Better image format support (JPEG, PNG, EXR, etc.)
     # - --opencolorio: Color management support (OCIO configs)
-    # - --embree: Better ray tracing performance
+    # - --embree: Better ray tracing performance (optional, may fail on some systems)
+    #   NOTE: Embree has a known CMake linking bug where the main libembree4.so library
+    #   doesn't properly link against the kernel static libraries (embree_sse42, embree_avx, etc.).
+    #   This causes "undefined reference" errors during linking. The script automatically
+    #   detects this error and retries the build without Embree. Core USD imaging works
+    #   fine without Embree - only ray tracing performance is reduced.
     # - --ptex: Ptex texture support (may require additional dependencies)
     # - --openvdb: OpenVDB volume support (may require additional dependencies)
     # - --vulkan: Vulkan rendering support (requires VULKAN_SDK environment variable)
@@ -595,7 +600,8 @@ if [ "$BUILD_USD" = true ]; then
     # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
     # Use -j flag to limit parallel jobs and avoid resource exhaustion
     
-    # Build command with conditional Vulkan flag
+    # Try building with Embree first (optional feature)
+    EMBREE_ENABLED=true
     BUILD_CMD=(
         "$PYTHON_FOR_BUILD" build_scripts/build_usd.py
         --build "$USD_BUILD_DIR/build"
@@ -622,11 +628,71 @@ if [ "$BUILD_USD" = true ]; then
     fi
     
     # Execute the build command
+    print_status "Building USD with all optional features (including Embree)..."
     "${BUILD_CMD[@]}"
     
     BUILD_EXIT_CODE=$?
+    
+    # Check if build failed due to Embree linking errors
+    if [ $BUILD_EXIT_CODE -ne 0 ]; then
+        # Check if the error is related to Embree linking by looking for the error pattern in log files
+        EMBREE_ERROR_FOUND=false
+        for LOG_FILE in "$USD_BUILD_DIR/build/embree"*/log.txt "$USD_BUILD_DIR/build/OpenUSD/log.txt"; do
+            if [ -f "$LOG_FILE" ] && grep -q "undefined reference.*embree::BVHN" "$LOG_FILE" 2>/dev/null; then
+                EMBREE_ERROR_FOUND=true
+                break
+            fi
+        done
+        
+        if [ "$EMBREE_ERROR_FOUND" = true ]; then
+            print_warning "Embree build failed with linking errors (known issue on some systems)"
+            print_warning "Retrying build without Embree (core USD imaging will still work)..."
+            
+            # Clean up the failed Embree build to avoid conflicts
+            for EMBREE_DIR in "$USD_BUILD_DIR/build/embree"*; do
+                if [ -d "$EMBREE_DIR" ]; then
+                    rm -rf "$EMBREE_DIR"
+                fi
+            done
+            
+            # Retry without Embree
+            BUILD_CMD=(
+                "$PYTHON_FOR_BUILD" build_scripts/build_usd.py
+                --build "$USD_BUILD_DIR/build"
+                --usd-imaging
+                --python
+                --onetbb
+                --openimageio
+                --opencolorio
+                --ptex
+                --openvdb
+                --no-examples
+                --no-tutorials
+                --no-tests
+                --no-docs
+                --no-materialx
+                -j "$PARALLEL_JOBS"
+                "$USD_INSTALL_DIR"
+            )
+            
+            # Add --vulkan flag only if Vulkan SDK is available
+            if [ "$VULKAN_ENABLED" = true ]; then
+                BUILD_CMD+=(--vulkan)
+            fi
+            
+            EMBREE_ENABLED=false
+            "${BUILD_CMD[@]}"
+            BUILD_EXIT_CODE=$?
+        fi
+    fi
+    
     if [ $BUILD_EXIT_CODE -eq 0 ]; then
-        print_status "USD built successfully with imaging support!"
+        if [ "$EMBREE_ENABLED" = false ]; then
+            print_status "USD built successfully with imaging support (without Embree)"
+            print_warning "Embree was disabled due to linking issues. Ray tracing performance may be reduced."
+        else
+            print_status "USD built successfully with imaging support (including Embree)!"
+        fi
     else
         print_error "USD build failed with exit code $BUILD_EXIT_CODE"
         print_error ""
@@ -646,6 +712,13 @@ if [ "$BUILD_USD" = true ]; then
         print_error "    If specific optional features fail to build, you can edit install.sh and remove"
         print_error "    the corresponding flags (--openimageio, --opencolorio, --embree, --ptex, --openvdb, --vulkan)."
         print_error "    Core USD imaging will still work without these optional features."
+        print_error ""
+        print_error "    Embree-specific issue:"
+        print_error "    Embree has a known CMake linking bug where libembree4.so doesn't properly link"
+        print_error "    against the kernel static libraries (embree_sse42, embree_avx, embree_avx2, embree_avx512)."
+        print_error "    This causes 'undefined reference to embree::BVHN<4>::...' errors. The script"
+        print_error "    automatically detects this and retries without Embree. Core USD imaging works"
+        print_error "    fine without Embree - only ray tracing performance is reduced."
         print_error "    Note: Vulkan requires VULKAN_SDK environment variable. The script automatically"
         print_error "    detects Vulkan SDK if installed, or disables Vulkan support if not found."
         print_error "  - Insufficient disk space (USD build with all features requires ~8-10GB)"
