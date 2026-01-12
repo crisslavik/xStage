@@ -8,7 +8,7 @@ Designed for VFX pipeline integration on RHEL9/AlmaLinux
 import sys
 import os
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass
 
 from PySide6.QtWidgets import (
