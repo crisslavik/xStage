@@ -77,23 +77,27 @@ check_python311() {
 
 # Check if we already have Python 3.11 installed in xStage directory
 if [ -f "$PYTHON_BIN" ]; then
-    PYTHON_VERSION=$("$PYTHON_BIN" --version 2>&1 | awk '{print $2}')
-    print_status "Python 3.11 found in xStage directory: $PYTHON_VERSION"
+    # Set LD_LIBRARY_PATH so Python can find its shared library
+    PYTHON_LIB_DIR="$PYTHON_DIR/lib"
+    export LD_LIBRARY_PATH="$PYTHON_LIB_DIR:${LD_LIBRARY_PATH:-}"
     
-    # Verify ctypes module is available (critical for OpenGL)
-    if ! "$PYTHON_BIN" -c "import ctypes; import _ctypes" 2>/dev/null; then
-        print_error "Python ctypes module is missing in existing installation!"
-        print_error "This Python was compiled without libffi support."
+    PYTHON_VERSION=$(LD_LIBRARY_PATH="$PYTHON_LIB_DIR:${LD_LIBRARY_PATH:-}" "$PYTHON_BIN" --version 2>&1 | awk '{print $2}')
+    
+    # Check if version extraction succeeded
+    if [ -z "$PYTHON_VERSION" ] || [ "$PYTHON_VERSION" = "error" ] || ! echo "$PYTHON_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        print_error "Failed to get Python version from existing installation."
+        print_error "Python may not be working correctly or shared library is missing."
         print_error ""
-        print_error "To fix this, you need to reinstall Python 3.11:"
-        print_error "  1. Remove the existing Python: rm -rf $PYTHON_DIR"
-        print_error "  2. Ensure libffi and libffi-devel are installed: sudo dnf install -y libffi libffi-devel"
-        print_error "  3. Re-run this install script"
+        print_error "Trying to run Python directly:"
+        LD_LIBRARY_PATH="$PYTHON_LIB_DIR:${LD_LIBRARY_PATH:-}" "$PYTHON_BIN" --version 2>&1 || true
+        print_error ""
+        print_error "Please check if libpython3.11.so exists in $PYTHON_LIB_DIR"
         exit 1
     fi
     
-    # Verify shared library is available (required for USD build)
-    PYTHON_LIB_DIR="$PYTHON_DIR/lib"
+    print_status "Python 3.11 found in xStage directory: $PYTHON_VERSION"
+    
+    # Verify shared library is available (required for USD build and for Python to run)
     if [ ! -f "$PYTHON_LIB_DIR/libpython3.11.so" ] && [ ! -f "$PYTHON_LIB_DIR/libpython3.11.so.1.0" ]; then
         print_error "Python shared library (libpython3.11.so) not found!"
         print_error "This Python was compiled without --enable-shared, which is required for USD build."
@@ -102,6 +106,18 @@ if [ -f "$PYTHON_BIN" ]; then
         print_error "To fix this, you need to reinstall Python 3.11 with shared libraries:"
         print_error "  1. Remove the existing Python: rm -rf $PYTHON_DIR"
         print_error "  2. Re-run this install script (it will build Python with --enable-shared)"
+        exit 1
+    fi
+    
+    # Verify ctypes module is available (critical for OpenGL)
+    if ! LD_LIBRARY_PATH="$PYTHON_LIB_DIR:${LD_LIBRARY_PATH:-}" "$PYTHON_BIN" -c "import ctypes; import _ctypes" 2>/dev/null; then
+        print_error "Python ctypes module is missing in existing installation!"
+        print_error "This Python was compiled without libffi support."
+        print_error ""
+        print_error "To fix this, you need to reinstall Python 3.11:"
+        print_error "  1. Remove the existing Python: rm -rf $PYTHON_DIR"
+        print_error "  2. Ensure libffi and libffi-devel are installed: sudo dnf install -y libffi libffi-devel"
+        print_error "  3. Re-run this install script"
         exit 1
     fi
     
@@ -197,9 +213,33 @@ else
     fi
     
     # Verify Python 3.11 installation
+    # Set LD_LIBRARY_PATH so Python can find its shared library
+    export LD_LIBRARY_PATH="$PYTHON_DIR/lib:${LD_LIBRARY_PATH:-}"
+    
     PYTHON_VERSION=$("$USE_PYTHON" --version 2>&1 | awk '{print $2}')
+    
+    # Check if version extraction succeeded
+    if [ -z "$PYTHON_VERSION" ] || [ "$PYTHON_VERSION" = "error" ] || ! echo "$PYTHON_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        print_error "Failed to get Python version. Python may not be working correctly."
+        print_error "This might be because the shared library is not in the library path."
+        print_error ""
+        print_error "Trying to run Python directly:"
+        "$USE_PYTHON" --version 2>&1 || true
+        print_error ""
+        print_error "Please check:"
+        print_error "  1. Is libpython3.11.so in $PYTHON_DIR/lib?"
+        print_error "  2. Try: LD_LIBRARY_PATH=$PYTHON_DIR/lib $USE_PYTHON --version"
+        exit 1
+    fi
+    
     PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
     PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+    
+    # Validate that we got numeric values
+    if ! [ "$PYTHON_MAJOR" -eq "$PYTHON_MAJOR" ] 2>/dev/null || ! [ "$PYTHON_MINOR" -eq "$PYTHON_MINOR" ] 2>/dev/null; then
+        print_error "Python version parsing failed. Got: $PYTHON_VERSION"
+        exit 1
+    fi
     
     if [ "$PYTHON_MAJOR" -ne 3 ] || [ "$PYTHON_MINOR" -ne 11 ]; then
         print_error "Python 3.11 installation verification failed. Got: $PYTHON_VERSION"
@@ -208,9 +248,34 @@ else
     
     print_status "Python 3.11 verified: $PYTHON_VERSION"
     
+    # Verify shared library is available (required for USD build and for Python to run)
+    echo "Verifying Python shared library..."
+    PYTHON_LIB_DIR="$PYTHON_DIR/lib"
+    PYTHON_SHARED_LIB=""
+    if [ -f "$PYTHON_LIB_DIR/libpython3.11.so" ]; then
+        PYTHON_SHARED_LIB="$PYTHON_LIB_DIR/libpython3.11.so"
+    elif [ -f "$PYTHON_LIB_DIR/libpython3.11.so.1.0" ]; then
+        PYTHON_SHARED_LIB="$PYTHON_LIB_DIR/libpython3.11.so.1.0"
+    fi
+    
+    if [ -z "$PYTHON_SHARED_LIB" ]; then
+        print_error "Python shared library (libpython3.11.so) not found!"
+        print_error "This usually means Python was compiled without --enable-shared."
+        print_error "USD build requires Python shared libraries to link executables."
+        print_error ""
+        print_error "Please rebuild Python with shared libraries:"
+        print_error "  1. Remove the Python installation: rm -rf $PYTHON_DIR"
+        print_error "  2. Re-run this install script (it will build Python with --enable-shared)"
+        exit 1
+    fi
+    
+    print_status "Python shared library found: $PYTHON_SHARED_LIB"
+    
     # Verify ctypes module is available (needed for OpenGL)
+    # Make sure LD_LIBRARY_PATH includes Python lib directory
+    export LD_LIBRARY_PATH="$PYTHON_LIB_DIR:${LD_LIBRARY_PATH:-}"
     echo "Verifying Python ctypes module..."
-    if "$USE_PYTHON" -c "import ctypes; import _ctypes" 2>/dev/null; then
+    if LD_LIBRARY_PATH="$PYTHON_LIB_DIR:${LD_LIBRARY_PATH:-}" "$USE_PYTHON" -c "import ctypes; import _ctypes" 2>/dev/null; then
         print_status "Python ctypes module OK"
     else
         print_error "Python ctypes module is missing!"
@@ -220,22 +285,6 @@ else
         print_error "Please ensure libffi and libffi-devel are installed, then:"
         print_error "  1. Remove the Python installation: rm -rf $PYTHON_DIR"
         print_error "  2. Re-run this install script"
-        exit 1
-    fi
-    
-    # Verify shared library is available (required for USD build)
-    echo "Verifying Python shared library..."
-    PYTHON_LIB_DIR="$PYTHON_DIR/lib"
-    if [ -f "$PYTHON_LIB_DIR/libpython3.11.so" ] || [ -f "$PYTHON_LIB_DIR/libpython3.11.so.1.0" ]; then
-        print_status "Python shared library OK"
-    else
-        print_error "Python shared library (libpython3.11.so) not found!"
-        print_error "This usually means Python was compiled without --enable-shared."
-        print_error "USD build requires Python shared libraries to link executables."
-        print_error ""
-        print_error "Please rebuild Python with shared libraries:"
-        print_error "  1. Remove the Python installation: rm -rf $PYTHON_DIR"
-        print_error "  2. Re-run this install script (it will build Python with --enable-shared)"
         exit 1
     fi
 fi
@@ -299,17 +348,22 @@ echo ""
 echo "Setting up Python 3.11 virtual environment (self-contained in xStage)..."
 VENV_DIR="$PROJECT_ROOT/.xstage_venv"
 
+# Ensure LD_LIBRARY_PATH is set for Python operations
+if [ -n "$PYTHON_DIR" ]; then
+    export LD_LIBRARY_PATH="$PYTHON_DIR/lib:${LD_LIBRARY_PATH:-}"
+fi
+
 if [ -d "$VENV_DIR" ]; then
     print_warning "Virtual environment already exists at $VENV_DIR"
     read -p "Remove and recreate? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -rf "$VENV_DIR"
-        "$USE_PYTHON" -m venv "$VENV_DIR"
+        LD_LIBRARY_PATH="$PYTHON_DIR/lib:${LD_LIBRARY_PATH:-}" "$USE_PYTHON" -m venv "$VENV_DIR"
         print_status "Virtual environment recreated with Python 3.11"
     fi
 else
-    "$USE_PYTHON" -m venv "$VENV_DIR"
+    LD_LIBRARY_PATH="$PYTHON_DIR/lib:${LD_LIBRARY_PATH:-}" "$USE_PYTHON" -m venv "$VENV_DIR"
     print_status "Virtual environment created with Python 3.11 (isolated, no system packages)"
 fi
 
