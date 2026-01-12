@@ -419,6 +419,27 @@ if [ "$BUILD_USD" = true ]; then
     # Use Python 3.11 from our virtual environment
     PYTHON_FOR_BUILD="$VENV_DIR/bin/python3"
     
+    # Determine number of parallel jobs (use 4 or CPU count, whichever is smaller)
+    # Too many parallel jobs can cause memory issues and make errors harder to see
+    if command -v nproc >/dev/null 2>&1; then
+        CPU_COUNT=$(nproc)
+    elif [ -f /proc/cpuinfo ]; then
+        CPU_COUNT=$(grep -c processor /proc/cpuinfo)
+    else
+        CPU_COUNT=4
+    fi
+    # Use a conservative number: min(CPU_COUNT, 8) to avoid resource exhaustion
+    if [ "$CPU_COUNT" -gt 8 ]; then
+        PARALLEL_JOBS=8
+    else
+        PARALLEL_JOBS=$CPU_COUNT
+    fi
+    # Minimum of 2 jobs for reasonable build speed
+    if [ "$PARALLEL_JOBS" -lt 2 ]; then
+        PARALLEL_JOBS=2
+    fi
+    print_status "Using $PARALLEL_JOBS parallel build jobs"
+    
     # Build USD with all imaging components
     # Note: We disable MaterialX (it's optional and requires Xt which causes build issues)
     # MaterialX is nice to have but not required for basic USD rendering
@@ -432,6 +453,7 @@ if [ "$BUILD_USD" = true ]; then
     # are disabled by default and not needed for basic Hydra rendering with Storm
     # 
     # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
+    # Use -j flag to limit parallel jobs and avoid resource exhaustion
     "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
         --build "$USD_BUILD_DIR/build" \
         --usd-imaging \
@@ -442,6 +464,7 @@ if [ "$BUILD_USD" = true ]; then
         --no-tests \
         --no-docs \
         --no-materialx \
+        -j "$PARALLEL_JOBS" \
         "$USD_INSTALL_DIR"
     
     BUILD_EXIT_CODE=$?
