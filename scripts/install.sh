@@ -365,12 +365,110 @@ fi
 # No need to install xStage as a package - we'll run it directly as a Python application
 print_status "xStage will run directly from source (no package installation needed)"
 
-# Verify USD 25.11+ installation
+# Build USD from source with imaging support (fully open source, no NVIDIA dependencies)
 echo ""
-echo "Verifying USD 25.11+ installation..."
-python3 << 'VERIFY_USD'
+echo "Building USD from source with imaging support..."
+echo "This will take 30-60 minutes depending on your system..."
+echo ""
+
+USD_BUILD_DIR="$PROJECT_ROOT/.xstage_usd_build"
+USD_INSTALL_DIR="$PROJECT_ROOT/.xstage_usd"
+BUILD_USD=false
+
+# Check if USD is already built
+if [ -d "$USD_INSTALL_DIR" ] && [ -f "$USD_INSTALL_DIR/lib/python/pxr/UsdImagingGL/__init__.py" ]; then
+    print_warning "USD with imaging support already built at $USD_INSTALL_DIR"
+    read -p "Rebuild USD? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf "$USD_BUILD_DIR" "$USD_INSTALL_DIR"
+        BUILD_USD=true
+    else
+        BUILD_USD=false
+    fi
+else
+    BUILD_USD=true
+fi
+
+if [ "$BUILD_USD" = true ]; then
+    print_status "Building USD from source (OpenUSD - fully open source)"
+    
+    # Clone OpenUSD repository
+    if [ ! -d "$USD_BUILD_DIR/OpenUSD" ]; then
+        mkdir -p "$USD_BUILD_DIR"
+        cd "$USD_BUILD_DIR"
+        print_status "Cloning OpenUSD repository (this may take a few minutes)..."
+        git clone --depth 1 --branch v25.11 https://github.com/PixarAnimationStudios/OpenUSD.git
+        cd OpenUSD
+    else
+        cd "$USD_BUILD_DIR/OpenUSD"
+        print_status "Updating OpenUSD repository..."
+        git fetch
+        git checkout v25.11
+        git pull
+    fi
+    
+    # Build USD with imaging support
+    print_status "Building USD with imaging support (this will take 30-60 minutes)..."
+    print_warning "This is a long build process. Please be patient..."
+    
+    # Use Python 3.11 from our virtual environment
+    PYTHON_FOR_BUILD="$VENV_DIR/bin/python3"
+    
+    # Build USD with all imaging components
+    "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
+        --build "$USD_BUILD_DIR/build" \
+        --imaging \
+        --python \
+        --no-examples \
+        --no-tutorials \
+        --no-tests \
+        --no-docs \
+        "$USD_INSTALL_DIR"
+    
+    if [ $? -eq 0 ]; then
+        print_status "USD built successfully with imaging support!"
+    else
+        print_error "USD build failed. Check the output above for errors."
+        print_error "Common issues:"
+        print_error "  - Missing build dependencies"
+        print_error "  - Insufficient disk space (USD build requires ~5GB)"
+        print_error "  - Network issues downloading dependencies"
+        exit 1
+    fi
+fi
+
+# Set up USD environment
+print_status "Setting up USD environment..."
+USD_PYTHON_PATH="$USD_INSTALL_DIR/lib/python"
+if [ -d "$USD_PYTHON_PATH" ]; then
+    # Add USD Python bindings to PYTHONPATH in virtual environment
+    cat >> "$VENV_DIR/bin/activate" << 'USD_ENV'
+
+# xStage USD environment
+export PXR_PLUGINPATH_NAME="$USD_INSTALL_DIR/plugin:$PXR_PLUGINPATH_NAME"
+export LD_LIBRARY_PATH="$USD_INSTALL_DIR/lib:$LD_LIBRARY_PATH"
+export PYTHONPATH="$USD_INSTALL_DIR/lib/python:$PYTHONPATH"
+USD_ENV
+    
+    # Replace $USD_INSTALL_DIR with actual path in activate script
+    sed -i "s|\$USD_INSTALL_DIR|$USD_INSTALL_DIR|g" "$VENV_DIR/bin/activate"
+    
+    print_status "USD environment configured"
+else
+    print_error "USD Python bindings not found at $USD_PYTHON_PATH"
+    exit 1
+fi
+
+# Verify USD 25.11+ installation with imaging support
+echo ""
+echo "Verifying USD 25.11+ installation with imaging support..."
+python3 << VERIFY_USD
+import sys
+sys.path.insert(0, "$USD_INSTALL_DIR/lib/python")
+
 try:
-    from pxr import Usd, UsdGeom
+    from pxr import Usd, UsdGeom, UsdImagingGL
     import pxr
     
     # Check version
@@ -387,22 +485,35 @@ try:
                     print(f"✓ USD Python bindings OK (version: {major}.{minor}.{patch})")
                     if major < 25 or (major == 25 and minor < 11):
                         print(f"⚠ Warning: USD {major}.{minor}.{patch} detected, but 25.11+ is required")
-                        exit(1)
+                        sys.exit(1)
                 else:
                     print("✓ USD Python bindings OK")
             else:
                 print("✓ USD Python bindings OK")
         except:
             print("✓ USD Python bindings OK (version check unavailable)")
+    
+    # Check for imaging support
+    try:
+        from pxr import UsdImagingGL, Glf
+        print("✓ UsdImagingGL available (Hydra rendering support)")
+        print("✓ Glf available (GL Framework)")
+        print("✓ Full USD imaging support enabled")
+    except ImportError as e:
+        print(f"✗ USD imaging support NOT available: {e}")
+        print("  This means USD was built without imaging support")
+        sys.exit(1)
+        
 except ImportError as e:
     print(f"✗ USD import failed: {e}")
-    exit(1)
+    sys.exit(1)
 VERIFY_USD
 
 if [ $? -eq 0 ]; then
-    print_status "USD 25.11+ verification passed"
+    print_status "USD 25.11+ with imaging support verification passed"
 else
-    print_error "USD 25.11+ verification failed - please ensure usd-core>=25.11 is installed"
+    print_error "USD 25.11+ with imaging support verification failed"
+    print_error "Please check the build output above for errors"
     exit 1
 fi
 
