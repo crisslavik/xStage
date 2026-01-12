@@ -43,6 +43,10 @@ class HydraViewportWidget(QOpenGLWidget):
         self.camera_rotation_y = 45.0
         self.camera_target = Gf.Vec3d(0.0, 0.0, 0.0)
         
+        # View mode (Perspective, Top, Front, Left, Back, Right)
+        self.view_mode = "Perspective"
+        self.current_usd_camera = None  # USD camera prim if using USD camera
+        
         # Store initial camera state (home position)
         self.home_camera_distance = 10.0
         self.home_camera_rotation_x = 30.0
@@ -169,11 +173,11 @@ class HydraViewportWidget(QOpenGLWidget):
             self.makeCurrent()
             
             # Clear
-            from OpenGL.GL import glClearColor, glClear, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT
-            glClearColor(
-                self.background_color[0],
-                self.background_color[1],
-                self.background_color[2],
+            if OPENGL_AVAILABLE:
+                glClearColor(
+                    self.background_color[0],
+                    self.background_color[1],
+                    self.background_color[2],
                     self.background_color[3]
                 )
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)

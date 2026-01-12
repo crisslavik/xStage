@@ -700,6 +700,10 @@ class ViewportWidget(QOpenGLWidget):
         self.camera_rotation_y = 45.0
         self.camera_target = np.array([0.0, 0.0, 0.0])
         
+        # View mode (Perspective, Top, Front, Left, Back, Right)
+        self.view_mode = "Perspective"
+        self.current_usd_camera = None  # USD camera prim if using USD camera
+        
         # Store initial camera state (home position)
         self.home_camera_distance = 10.0
         self.home_camera_rotation_x = 30.0
@@ -1157,6 +1161,20 @@ class USDViewerWindow(QMainWindow):
         # Enable drag and drop for USD files
         self.setAcceptDrops(True)
         
+        # Create viewport container with header
+        from PySide6.QtWidgets import QVBoxLayout, QWidget
+        viewport_container = QWidget()
+        viewport_layout = QVBoxLayout()
+        viewport_layout.setContentsMargins(0, 0, 0, 0)
+        viewport_layout.setSpacing(0)
+        
+        # Create viewport header (Omniverse-style)
+        from ..ui.widgets.viewport_header import ViewportHeader
+        self.viewport_header = ViewportHeader()
+        self.viewport_header.camera_changed.connect(self.on_viewport_camera_changed)
+        self.viewport_header.view_changed.connect(self.on_viewport_view_changed)
+        viewport_layout.addWidget(self.viewport_header)
+        
         # Create central widget with viewport
         # Try to use Hydra viewport if available, fallback to OpenGL
         self.hydra_viewport = None
@@ -1171,8 +1189,8 @@ class USDViewerWindow(QMainWindow):
                 # UsdImagingGL is available, create Hydra viewport
                 self.hydra_viewport = HydraViewportWidget()
                 self.hydra_viewport.set_stage_manager(self.stage_manager)
-                # Start with Hydra viewport (better rendering)
-                self.setCentralWidget(self.hydra_viewport)
+                # Add Hydra viewport to container
+                viewport_layout.addWidget(self.hydra_viewport)
                 self.use_hydra = True
                 self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
             except (ImportError, Exception) as e:
@@ -1180,15 +1198,18 @@ class USDViewerWindow(QMainWindow):
                 print(f"Hydra 2.0 viewport is not available: {e}")
                 print("Using OpenGL fallback")
                 self.hydra_viewport = None
-                self.setCentralWidget(self.viewport)
+                viewport_layout.addWidget(self.viewport)
                 self.use_hydra = False
         except (ImportError, Exception) as e:
             # Hydra viewport class not available or failed to create
             print(f"Hydra 2.0 viewport is not available: {e}")
             print("Using OpenGL fallback")
             self.hydra_viewport = None
-            self.setCentralWidget(self.viewport)
+            viewport_layout.addWidget(self.viewport)
             self.use_hydra = False
+        
+        viewport_container.setLayout(viewport_layout)
+        self.setCentralWidget(viewport_container)
         
         # Add viewport overlay (will be shown after viewport is visible)
         from ..utils.viewport_overlay import ViewportOverlay
@@ -1778,6 +1799,10 @@ class USDViewerWindow(QMainWindow):
             for key, label in self.info_labels.items():
                 if key in info:
                     label.setText(str(info[key]))
+            
+            # Update viewport header with stage cameras
+            if hasattr(self, 'viewport_header'):
+                self.viewport_header.set_stage(self.stage_manager.stage)
             
             # Update statistics
             geometry_data = self.stage_manager.get_geometry_data(self.stage_manager.current_time)
