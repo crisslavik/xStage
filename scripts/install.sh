@@ -423,13 +423,16 @@ if [ "$BUILD_USD" = true ]; then
     # Note: We disable MaterialX (it's optional and requires Xt which causes build issues)
     # MaterialX is nice to have but not required for basic USD rendering
     # Imaging support (UsdImagingGL) is what we need for viewport rendering
-    # --imaging enables the imaging library
-    # --usdview enables UsdImaging (which provides UsdImagingGL for Hydra)
-    # The optional imaging features (Ptex, OpenVDB, etc.) are not needed for basic rendering
+    # 
+    # IMPORTANT: --imaging and --usd-imaging are mutually exclusive!
+    # --usd-imaging enables BOTH Imaging library AND UsdImaging (which provides UsdImagingGL)
+    # This is what we need for Hydra rendering in xStage
+    # 
+    # The optional imaging features (Ptex, OpenVDB, ImageIO, OpenImageIO, OCIO, Embree, PRMan, Vulkan)
+    # are disabled by default and not needed for basic Hydra rendering with Storm
     "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
         --build "$USD_BUILD_DIR/build" \
-        --imaging \
-        --usdview \
+        --usd-imaging \
         --python \
         --no-examples \
         --no-tutorials \
