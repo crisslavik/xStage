@@ -81,20 +81,50 @@ class HydraViewportWidget(QOpenGLWidget):
         self.setFormat(format)
     
     def initializeGL(self):
-        """Initialize OpenGL and Hydra"""
+        """Initialize OpenGL and Hydra 2.0"""
         if not USD_AVAILABLE:
             return
         
         try:
-            # Initialize GLF (GL Framework)
+            # CRITICAL: Make OpenGL context current before any GL calls
+            self.makeCurrent()
+            
+            # Initialize GLF (GL Framework) - required for Storm
             if Glf:
                 Glf.GlewInit()
             
             # Create Hydra engine
             self.engine = UsdImagingGL.Engine()
             
-            # Get renderer
-            self.renderer = self.engine.GetRenderer()
+            # CRITICAL: Enable Scene Index (Hydra 2.0 requirement)
+            try:
+                self.engine.SetEnableSceneIndex(True)
+                print("✅ Hydra 2.0 Scene Index enabled")
+            except Exception as e:
+                print(f"⚠️  Scene Index enable failed (may be Hydra 1.0): {e}")
+            
+            # CRITICAL: Set Storm renderer explicitly (Hydra 2.0 GPU renderer)
+            try:
+                available_renderers = self.engine.GetRendererPlugins()
+                print(f"Available renderers: {available_renderers}")
+                
+                if 'HdStormRendererPlugin' in available_renderers:
+                    self.engine.SetRendererPlugin('HdStormRendererPlugin')
+                    print("✅ Storm renderer (Hydra 2.0 GPU) enabled")
+                else:
+                    print("⚠️  Storm renderer not available - using default")
+                    if available_renderers:
+                        self.engine.SetRendererPlugin(available_renderers[0])
+            except Exception as e:
+                print(f"⚠️  Renderer plugin selection failed: {e}")
+            
+            # Get renderer (for verification)
+            try:
+                self.renderer = self.engine.GetRenderer()
+                current_renderer = self.engine.GetCurrentRendererId()
+                print(f"Current renderer: {current_renderer}")
+            except Exception as e:
+                print(f"⚠️  Could not get renderer info: {e}")
             
             # Set render params
             self.render_params = UsdImagingGL.RenderParams()
@@ -103,15 +133,22 @@ class HydraViewportWidget(QOpenGLWidget):
             self.render_params.drawMode = UsdImagingGL.DrawMode.DRAW_SHADED_SMOOTH
             self.render_params.enableLighting = True
             self.render_params.enableIdRender = False
-            self.render_params.enableSampleAlphaToCoverage = False
+            self.render_params.enableSampleAlphaToCoverage = True  # Better transparency
             self.render_params.highlight = False
-            self.render_params.cullStyle = UsdImagingGL.CullStyle.CULL_STYLE_BACK
+            self.render_params.cullStyle = UsdImagingGL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+            self.render_params.showGuides = False
+            self.render_params.showProxy = True
+            self.render_params.showRender = False
             
             # Set background color
             self.render_params.clearColor = self.background_color
             
+            print("✅ Hydra engine initialized successfully")
+            
         except Exception as e:
-            print(f"Error initializing Hydra: {e}")
+            print(f"❌ Error initializing Hydra: {e}")
+            import traceback
+            traceback.print_exc()
             self.engine = None
     
     def resizeGL(self, w, h):
@@ -123,35 +160,61 @@ class HydraViewportWidget(QOpenGLWidget):
         self.engine.SetRenderViewport(Gf.Rect2i(Gf.Vec2i(0, 0), w, h))
     
     def paintGL(self):
-        """Render using Hydra"""
+        """Render using Hydra 2.0"""
         if not USD_AVAILABLE or not self.engine or not self.stage:
             return
         
         try:
+            # Make context current
+            self.makeCurrent()
+            
             # Clear
+            from OpenGL.GL import glClearColor, glClear, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT
             glClearColor(
                 self.background_color[0],
                 self.background_color[1],
                 self.background_color[2],
-                self.background_color[3]
-            )
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+                    self.background_color[3]
+                )
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             
-            # Set up camera
-            camera_matrix = self._compute_camera_matrix()
+            # Set viewport size
+            width = self.width()
+            height = self.height()
+            self.engine.SetRenderViewport(Gf.Rect2i(Gf.Vec2i(0, 0), width, height))
+            
+            # Compute camera matrices
+            view_matrix, projection_matrix = self._compute_camera_matrices()
+            
+            # CRITICAL: Set camera state (Hydra 2.0 requirement)
+            try:
+                self.engine.SetCameraState(view_matrix, projection_matrix)
+            except Exception as e:
+                print(f"⚠️  SetCameraState failed (may use legacy API): {e}")
+                # Fallback to legacy matrix multiplication
+                camera_matrix = projection_matrix * view_matrix
             
             # Set render params
-            self.render_params.frame = self.current_time
+            self.render_params.frame = Usd.TimeCode(self.current_time)
             
-            # Render
+            # Render root prim
             root_prim = self.stage.GetPseudoRoot()
-            self.engine.Render(root_prim, self.render_params, camera_matrix)
+            
+            # Try new API first (Hydra 2.0)
+            try:
+                self.engine.Render(root_prim, self.render_params)
+            except TypeError:
+                # Fallback to legacy API with matrix
+                camera_matrix = projection_matrix * view_matrix
+                self.engine.Render(root_prim, self.render_params, camera_matrix)
             
         except Exception as e:
-            print(f"Error rendering with Hydra: {e}")
+            print(f"❌ Error rendering with Hydra: {e}")
+            import traceback
+            traceback.print_exc()
     
-    def _compute_camera_matrix(self):
-        """Compute camera view and projection matrices"""
+    def _compute_camera_matrices(self):
+        """Compute camera view and projection matrices (separate for Hydra 2.0)"""
         # Calculate camera position
         cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
         cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
@@ -182,7 +245,7 @@ class HydraViewportWidget(QOpenGLWidget):
             self.far_clip
         )
         
-        return projection_matrix * view_matrix
+        return view_matrix, projection_matrix
     
     def set_stage_manager(self, manager):
         """Set the USD stage manager"""
