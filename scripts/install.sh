@@ -535,6 +535,27 @@ if [ "$BUILD_USD" = true ]; then
     fi
     print_status "Using $PARALLEL_JOBS parallel build jobs"
     
+    # Check for system-wide Embree installation
+    EMBREE_SYSTEM_AVAILABLE=false
+    if pkg-config --exists embree4 2>/dev/null; then
+        EMBREE_VERSION=$(pkg-config --modversion embree4 2>/dev/null)
+        EMBREE_SYSTEM_AVAILABLE=true
+        print_status "System Embree found (version: $EMBREE_VERSION via pkg-config)"
+    elif [ -f "/usr/lib/libembree4.so" ] || [ -f "/usr/lib64/libembree4.so" ] || \
+         [ -f "/usr/local/lib/libembree4.so" ] || [ -f "/usr/local/lib64/libembree4.so" ]; then
+        EMBREE_SYSTEM_AVAILABLE=true
+        print_status "System Embree library found"
+    fi
+    
+    if [ "$EMBREE_SYSTEM_AVAILABLE" = false ]; then
+        print_warning "System Embree not found. Will attempt to build Embree with USD."
+        print_warning "If Embree build fails, you can install it system-wide:"
+        print_warning "  - Debian/Ubuntu: sudo apt-get install libembree-dev"
+        print_warning "  - Fedora/RHEL: sudo dnf install embree-devel"
+        print_warning "  - Arch: sudo pacman -S embree"
+        print_warning "Then re-run this script to use system Embree."
+    fi
+    
     # Check for Vulkan SDK (required for --vulkan flag)
     VULKAN_ENABLED=false
     if [ -n "$VULKAN_SDK" ]; then
@@ -562,11 +583,26 @@ if [ "$BUILD_USD" = true ]; then
                 break
             fi
         done
+        
+        # Check for system-wide Vulkan development packages
+        if [ "$VULKAN_ENABLED" = false ]; then
+            if pkg-config --exists vulkan 2>/dev/null; then
+                VULKAN_VERSION=$(pkg-config --modversion vulkan 2>/dev/null)
+                print_status "System Vulkan found (version: $VULKAN_VERSION via pkg-config)"
+                # Note: USD's build_usd.py requires VULKAN_SDK to be set, not just pkg-config
+                # So we still mark it as disabled, but inform the user
+                print_warning "System Vulkan detected, but USD build requires VULKAN_SDK environment variable."
+                print_warning "To enable Vulkan support:"
+                print_warning "  1. Install Vulkan SDK from https://vulkan.lunarg.com/"
+                print_warning "  2. Set VULKAN_SDK environment variable to the SDK path"
+                print_warning "  3. Re-run this script"
+            fi
+        fi
     fi
     
     if [ "$VULKAN_ENABLED" = false ]; then
         print_warning "Vulkan SDK not found. Vulkan support will be disabled."
-        print_warning "To enable Vulkan:"
+        print_warning "To enable Vulkan (provides better rendering performance on Linux):"
         print_warning "  1. Install Vulkan SDK from https://vulkan.lunarg.com/"
         print_warning "  2. Set VULKAN_SDK environment variable to the SDK path"
         print_warning "  3. Re-run this script"
@@ -600,8 +636,17 @@ if [ "$BUILD_USD" = true ]; then
     # Use bundled TBB (onetbb) to avoid compatibility issues with system TBB versions
     # Use -j flag to limit parallel jobs and avoid resource exhaustion
     
-    # Try building with Embree first (optional feature)
+    # Build command - use system Embree if available, otherwise build it
     EMBREE_ENABLED=true
+    EMBREE_BUILD_FLAG=""
+    if [ "$EMBREE_SYSTEM_AVAILABLE" = true ]; then
+        print_status "Using system Embree (will not build bundled Embree)"
+        EMBREE_BUILD_FLAG=""  # Don't use --embree flag, USD will find system Embree
+    else
+        print_status "System Embree not found, will attempt to build Embree with USD"
+        EMBREE_BUILD_FLAG="--embree"  # Build Embree as part of USD
+    fi
+    
     BUILD_CMD=(
         "$PYTHON_FOR_BUILD" build_scripts/build_usd.py
         --build "$USD_BUILD_DIR/build"
@@ -610,7 +655,6 @@ if [ "$BUILD_USD" = true ]; then
         --onetbb
         --openimageio
         --opencolorio
-        --embree
         --ptex
         --openvdb
         --no-examples
@@ -622,13 +666,22 @@ if [ "$BUILD_USD" = true ]; then
         "$USD_INSTALL_DIR"
     )
     
+    # Add --embree flag only if system Embree is not available
+    if [ -n "$EMBREE_BUILD_FLAG" ]; then
+        BUILD_CMD+=(--embree)
+    fi
+    
     # Add --vulkan flag only if Vulkan SDK is available
     if [ "$VULKAN_ENABLED" = true ]; then
         BUILD_CMD+=(--vulkan)
     fi
     
     # Execute the build command and capture output
-    print_status "Building USD with all optional features (including Embree)..."
+    if [ "$EMBREE_SYSTEM_AVAILABLE" = true ]; then
+        print_status "Building USD with all optional features (using system Embree)..."
+    else
+        print_status "Building USD with all optional features (including Embree build)..."
+    fi
     BUILD_OUTPUT_FILE=$(mktemp)
     set +e  # Don't exit on error, we'll check exit code manually
     "${BUILD_CMD[@]}" 2>&1 | tee "$BUILD_OUTPUT_FILE"
@@ -655,9 +708,14 @@ if [ "$BUILD_USD" = true ]; then
             done
         fi
         
-        if [ "$EMBREE_ERROR_FOUND" = true ]; then
+        # Only retry if we were building Embree (not using system Embree)
+        if [ "$EMBREE_ERROR_FOUND" = true ] && [ "$EMBREE_SYSTEM_AVAILABLE" = false ]; then
             print_warning "Embree build failed with linking errors (known issue on some systems)"
             print_warning "Retrying build without Embree (core USD imaging will still work)..."
+            print_warning "Tip: Install system Embree to avoid this issue:"
+            print_warning "  - Debian/Ubuntu: sudo apt-get install libembree-dev"
+            print_warning "  - Fedora/RHEL: sudo dnf install embree-devel"
+            print_warning "  - Arch: sudo pacman -S embree"
             
             # Clean up the failed Embree build to avoid conflicts
             for EMBREE_DIR in "$USD_BUILD_DIR/build/embree"*; do
@@ -706,8 +764,14 @@ if [ "$BUILD_USD" = true ]; then
         if [ "$EMBREE_ENABLED" = false ]; then
             print_status "USD built successfully with imaging support (without Embree)"
             print_warning "Embree was disabled due to linking issues. Ray tracing performance may be reduced."
+            print_warning "Tip: Install system Embree to enable ray tracing enhancements:"
+            print_warning "  - Debian/Ubuntu: sudo apt-get install libembree-dev"
+            print_warning "  - Fedora/RHEL: sudo dnf install embree-devel"
+            print_warning "  - Arch: sudo pacman -S embree"
+        elif [ "$EMBREE_SYSTEM_AVAILABLE" = true ]; then
+            print_status "USD built successfully with imaging support (using system Embree)!"
         else
-            print_status "USD built successfully with imaging support (including Embree)!"
+            print_status "USD built successfully with imaging support (including bundled Embree)!"
         fi
     else
         print_error "USD build failed with exit code $BUILD_EXIT_CODE"
