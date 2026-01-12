@@ -222,35 +222,124 @@ class HydraViewportWidget(QOpenGLWidget):
     
     def _compute_camera_matrices(self):
         """Compute camera view and projection matrices (separate for Hydra 2.0)"""
-        # Calculate camera position
-        cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-        cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-        cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+        aspect = self.width() / max(self.height(), 1)
         
-        camera_pos = Gf.Vec3d(
-            self.camera_target[0] + cam_x,
-            self.camera_target[1] + cam_y,
-            self.camera_target[2] + cam_z
-        )
+        # Calculate camera position and orientation based on view mode
+        view_mode = getattr(self, 'view_mode', 'Perspective')
+        
+        if view_mode == "Perspective":
+            # Free camera (perspective)
+            cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+            cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0] + cam_x,
+                self.camera_target[1] + cam_y,
+                self.camera_target[2] + cam_z
+            )
+            up_vector = Gf.Vec3d(0, 1, 0)
+        elif view_mode == "Top":
+            # Top view: camera above, looking down
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0],
+                self.camera_target[1] + self.camera_distance,
+                self.camera_target[2]
+            )
+            up_vector = Gf.Vec3d(0, 0, -1)  # Negative Z is "up" in top view
+        elif view_mode == "Front":
+            # Front view: camera in front, looking back
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0],
+                self.camera_target[1],
+                self.camera_target[2] + self.camera_distance
+            )
+            up_vector = Gf.Vec3d(0, 1, 0)
+        elif view_mode == "Left":
+            # Left view: camera on left, looking right
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0] - self.camera_distance,
+                self.camera_target[1],
+                self.camera_target[2]
+            )
+            up_vector = Gf.Vec3d(0, 1, 0)
+        elif view_mode == "Back":
+            # Back view: camera behind, looking forward
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0],
+                self.camera_target[1],
+                self.camera_target[2] - self.camera_distance
+            )
+            up_vector = Gf.Vec3d(0, 1, 0)
+        elif view_mode == "Right":
+            # Right view: camera on right, looking left
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0] + self.camera_distance,
+                self.camera_target[1],
+                self.camera_target[2]
+            )
+            up_vector = Gf.Vec3d(0, 1, 0)
+        else:
+            # Default to perspective
+            cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+            cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+            camera_pos = Gf.Vec3d(
+                self.camera_target[0] + cam_x,
+                self.camera_target[1] + cam_y,
+                self.camera_target[2] + cam_z
+            )
+            up_vector = Gf.Vec3d(0, 1, 0)
         
         # Create view matrix
         view_matrix = Gf.Matrix4d()
         view_matrix.SetLookAt(
-            Gf.Vec3d(camera_pos[0], camera_pos[1], camera_pos[2]),
+            camera_pos,
             Gf.Vec3d(self.camera_target[0], self.camera_target[1], self.camera_target[2]),
-            Gf.Vec3d(0, 1, 0)
+            up_vector
         )
         
         # Create projection matrix
-        aspect = self.width() / max(self.height(), 1)
-        projection_matrix = CameraUtil.Frustum(
-            -self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)) * aspect,
-            self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)) * aspect,
-            -self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)),
-            self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)),
-            self.near_clip,
-            self.far_clip
-        )
+        if view_mode == "Perspective":
+            # Perspective projection
+            projection_matrix = CameraUtil.Frustum(
+                -self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)) * aspect,
+                self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)) * aspect,
+                -self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)),
+                self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)),
+                self.near_clip,
+                self.far_clip
+            )
+        else:
+            # Orthographic projection for ortho views
+            ortho_size = self.camera_distance * 0.5
+            if ORTHOGRAPHIC_AVAILABLE and hasattr(CameraUtil, 'Orthographic'):
+                projection_matrix = CameraUtil.Orthographic(
+                    -ortho_size * aspect,
+                    ortho_size * aspect,
+                    -ortho_size,
+                    ortho_size,
+                    self.near_clip,
+                    self.far_clip
+                )
+            else:
+                # Fallback: create orthographic matrix manually
+                # Orthographic: left, right, bottom, top, near, far
+                left = -ortho_size * aspect
+                right = ortho_size * aspect
+                bottom = -ortho_size
+                top = ortho_size
+                near = self.near_clip
+                far = self.far_clip
+                
+                # Create orthographic projection matrix
+                projection_matrix = Gf.Matrix4d()
+                projection_matrix[0][0] = 2.0 / (right - left)
+                projection_matrix[1][1] = 2.0 / (top - bottom)
+                projection_matrix[2][2] = -2.0 / (far - near)
+                projection_matrix[3][0] = -(right + left) / (right - left)
+                projection_matrix[3][1] = -(top + bottom) / (top - bottom)
+                projection_matrix[3][2] = -(far + near) / (far - near)
+                projection_matrix[3][3] = 1.0
         
         return view_matrix, projection_matrix
     
