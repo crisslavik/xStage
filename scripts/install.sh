@@ -423,7 +423,9 @@ if [ "$BUILD_USD" = true ]; then
     # Note: We disable MaterialX (it's optional and requires Xt which causes build issues)
     # MaterialX is nice to have but not required for basic USD rendering
     # Imaging support (UsdImagingGL) is what we need for viewport rendering
-    # --imaging enables the imaging library, but we also need UsdImaging for UsdImagingGL
+    # --imaging enables the imaging library
+    # --usd-imaging enables UsdImaging (which provides UsdImagingGL for Hydra)
+    # The optional imaging features (Ptex, OpenVDB, etc.) are not needed for basic rendering
     "$PYTHON_FOR_BUILD" build_scripts/build_usd.py \
         --build "$USD_BUILD_DIR/build" \
         --imaging \
