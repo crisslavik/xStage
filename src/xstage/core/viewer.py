@@ -754,10 +754,25 @@ class ViewportWidget(QOpenGLWidget):
         """Frame camera to fit bounds"""
         if not bounds:
             return
+        
+        center = bounds.get('center', np.array([0.0, 0.0, 0.0]))
+        size_array = bounds.get('size', np.array([1.0, 1.0, 1.0]))
+        
+        # Ensure center and size are numpy arrays
+        if not isinstance(center, np.ndarray):
+            center = np.array(center)
+        if not isinstance(size_array, np.ndarray):
+            size_array = np.array(size_array)
             
-        self.camera_target = bounds['center']
-        size = np.max(bounds['size'])
-        self.camera_distance = size * 2.0
+        self.camera_target = center
+        size = np.max(size_array)
+        # Calculate distance to fit the entire bounding box
+        # Use FOV to calculate appropriate distance
+        fov_rad = np.radians(self.settings.camera_fov)
+        distance = size / (2.0 * np.tan(fov_rad / 2.0)) * 1.5  # Add 50% padding
+        self.camera_distance = max(distance, 0.1)  # Ensure minimum distance
+        
+        print(f"DEBUG: Framed camera. Target: {self.camera_target}, Distance: {self.camera_distance}, Size: {size}")
         self.update()
     
     def frame_selected(self):
@@ -974,7 +989,8 @@ class ViewportWidget(QOpenGLWidget):
             print(f"DEBUG: geometry_data['meshes'] is empty. Total meshes: {len(self.geometry_data.get('meshes', []))}")
             return
         
-        print(f"DEBUG: Drawing {len(self.geometry_data['meshes'])} meshes")
+        # Don't print every frame - too verbose
+        # print(f"DEBUG: Drawing {len(self.geometry_data['meshes'])} meshes")
         
         glEnable(GL_LIGHTING)
         glEnable(GL_DEPTH_TEST)
@@ -1000,19 +1016,27 @@ class ViewportWidget(QOpenGLWidget):
     
     def draw_mesh(self, mesh: Dict):
         """Draw a single mesh"""
-        points = mesh['points']
-        fvc = mesh['face_vertex_counts']
-        fvi = mesh['face_vertex_indices']
-        normals = mesh['normals']
+        points = mesh.get('points')
+        fvc = mesh.get('face_vertex_counts')
+        fvi = mesh.get('face_vertex_indices')
+        normals = mesh.get('normals')
+        
+        if not points or not fvc or not fvi:
+            return  # Skip invalid meshes
         
         # Apply transform
         glPushMatrix()
-        transform = mesh['transform'].T  # OpenGL uses column-major
-        glMultMatrixf(transform.flatten())
+        if 'transform' in mesh and mesh['transform'] is not None:
+            transform = mesh['transform'].T  # OpenGL uses column-major
+            glMultMatrixf(transform.flatten())
         
         # Draw faces
         idx = 0
         for count in fvc:
+            if count < 3:  # Skip invalid face counts
+                idx += count
+                continue
+                
             if count == 3:
                 glBegin(GL_TRIANGLES)
             elif count == 4:
@@ -1023,14 +1047,21 @@ class ViewportWidget(QOpenGLWidget):
             for i in range(count):
                 vert_idx = fvi[idx + i]
                 
+                # Bounds check
+                if vert_idx >= len(points):
+                    continue
+                    
                 # Normal
-                if normals is not None and vert_idx < len(normals):
+                if normals is not None and len(normals) > 0 and vert_idx < len(normals):
                     n = normals[vert_idx]
-                    glNormal3f(n[0], n[1], n[2])
+                    glNormal3f(float(n[0]), float(n[1]), float(n[2]))
+                else:
+                    # Calculate normal on the fly if missing
+                    glNormal3f(0.0, 1.0, 0.0)  # Default up normal
                     
                 # Vertex
                 v = points[vert_idx]
-                glVertex3f(v[0], v[1], v[2])
+                glVertex3f(float(v[0]), float(v[1]), float(v[2]))
                 
             glEnd()
             idx += count
