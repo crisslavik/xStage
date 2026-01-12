@@ -444,14 +444,27 @@ if [ "$BUILD_USD" = true ]; then
         --no-materialx \
         "$USD_INSTALL_DIR"
     
-    if [ $? -eq 0 ]; then
+    BUILD_EXIT_CODE=$?
+    if [ $BUILD_EXIT_CODE -eq 0 ]; then
         print_status "USD built successfully with imaging support!"
     else
-        print_error "USD build failed. Check the output above for errors."
+        print_error "USD build failed with exit code $BUILD_EXIT_CODE"
+        print_error ""
+        print_error "To diagnose the issue, check:"
+        print_error "  1. The build output above for specific error messages"
+        print_error "  2. Build logs in: $USD_BUILD_DIR/build/OpenUSD/log.txt (if available)"
+        print_error "  3. CMake error logs in: $USD_BUILD_DIR/build/OpenUSD/CMakeFiles/"
+        print_error ""
         print_error "Common issues:"
-        print_error "  - Missing build dependencies"
+        print_error "  - Missing build dependencies (check that all required packages are installed)"
         print_error "  - Insufficient disk space (USD build requires ~5GB)"
         print_error "  - Network issues downloading dependencies"
+        print_error "  - Compiler compatibility issues (try with fewer parallel jobs: -j 4)"
+        print_error "  - TBB version incompatibility (using bundled TBB with --onetbb)"
+        print_error ""
+        print_error "To retry the build, run:"
+        print_error "  rm -rf $USD_BUILD_DIR $USD_INSTALL_DIR"
+        print_error "  ./scripts/install.sh"
         exit 1
     fi
 fi
