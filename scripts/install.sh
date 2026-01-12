@@ -301,11 +301,12 @@ echo ""
 
 # Create temporary requirements without usd-core (we'll build USD from source)
 TEMP_REQUIREMENTS=$(mktemp)
-grep -v "^usd-core" requirements.txt > "$TEMP_REQUIREMENTS"
+# Remove usd-core completely (with or without comment, any line containing usd-core)
+grep -v "usd-core" requirements.txt > "$TEMP_REQUIREMENTS" || true
 
 # Install requirements (this will install OCIO 2.2, QuiltiX automatically, but NOT usd-core)
 # Note: PyOpenColorIO may not be available for all Python versions/platforms - it's optional
-if [ -f "requirements.txt" ]; then
+if [ -f "$TEMP_REQUIREMENTS" ]; then
     # Try to install all requirements, but don't fail if PyOpenColorIO is missing
     PIP_OUTPUT=$(mktemp)
     set +e  # Temporarily disable exit on error
@@ -323,9 +324,9 @@ if [ -f "requirements.txt" ]; then
             print_warning "Some optional dependencies not available for this platform/Python version"
             print_warning "Installing other dependencies without optional packages..."
             
-            # Create temporary requirements without optional packages
+            # Create temporary requirements without optional packages and usd-core
             TEMP_REQUIREMENTS=$(mktemp)
-            grep -v "PyOpenColorIO" requirements.txt | grep -v "quiltix" > "$TEMP_REQUIREMENTS"
+            grep -v "PyOpenColorIO" requirements.txt | grep -v "quiltix" | grep -v "usd-core" > "$TEMP_REQUIREMENTS"
             
             # Install without optional packages (this should succeed)
             set +e  # Temporarily disable exit on error
