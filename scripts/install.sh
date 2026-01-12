@@ -627,22 +627,33 @@ if [ "$BUILD_USD" = true ]; then
         BUILD_CMD+=(--vulkan)
     fi
     
-    # Execute the build command
+    # Execute the build command and capture output
     print_status "Building USD with all optional features (including Embree)..."
-    "${BUILD_CMD[@]}"
-    
-    BUILD_EXIT_CODE=$?
+    BUILD_OUTPUT_FILE=$(mktemp)
+    set +e  # Don't exit on error, we'll check exit code manually
+    "${BUILD_CMD[@]}" 2>&1 | tee "$BUILD_OUTPUT_FILE"
+    BUILD_EXIT_CODE=${PIPESTATUS[0]}
+    set -e  # Re-enable exit on error
     
     # Check if build failed due to Embree linking errors
     if [ $BUILD_EXIT_CODE -ne 0 ]; then
-        # Check if the error is related to Embree linking by looking for the error pattern in log files
+        # Check if the error is related to Embree linking by looking for multiple error patterns
         EMBREE_ERROR_FOUND=false
-        for LOG_FILE in "$USD_BUILD_DIR/build/embree"*/log.txt "$USD_BUILD_DIR/build/OpenUSD/log.txt"; do
-            if [ -f "$LOG_FILE" ] && grep -q "undefined reference.*embree::BVHN" "$LOG_FILE" 2>/dev/null; then
-                EMBREE_ERROR_FOUND=true
-                break
-            fi
-        done
+        
+        # Check captured build output
+        if grep -qE "(undefined reference.*embree::(BVHN|sse42|avx|avx2|avx512)|ERROR: Failed to run.*embree)" "$BUILD_OUTPUT_FILE" 2>/dev/null; then
+            EMBREE_ERROR_FOUND=true
+        fi
+        
+        # Also check log files if they exist
+        if [ "$EMBREE_ERROR_FOUND" = false ]; then
+            for LOG_FILE in "$USD_BUILD_DIR/build/embree"*/log.txt "$USD_BUILD_DIR/build/OpenUSD/log.txt"; do
+                if [ -f "$LOG_FILE" ] && grep -qE "undefined reference.*embree::(BVHN|sse42|avx|avx2|avx512)" "$LOG_FILE" 2>/dev/null; then
+                    EMBREE_ERROR_FOUND=true
+                    break
+                fi
+            done
+        fi
         
         if [ "$EMBREE_ERROR_FOUND" = true ]; then
             print_warning "Embree build failed with linking errors (known issue on some systems)"
@@ -681,10 +692,15 @@ if [ "$BUILD_USD" = true ]; then
             fi
             
             EMBREE_ENABLED=false
-            "${BUILD_CMD[@]}"
-            BUILD_EXIT_CODE=$?
+            set +e  # Don't exit on error, we'll check exit code manually
+            "${BUILD_CMD[@]}" 2>&1 | tee "$BUILD_OUTPUT_FILE"
+            BUILD_EXIT_CODE=${PIPESTATUS[0]}
+            set -e  # Re-enable exit on error
         fi
     fi
+    
+    # Clean up temp file (always, whether build succeeded or failed)
+    rm -f "$BUILD_OUTPUT_FILE"
     
     if [ $BUILD_EXIT_CODE -eq 0 ]; then
         if [ "$EMBREE_ENABLED" = false ]; then
