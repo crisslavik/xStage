@@ -1064,6 +1064,142 @@ class ViewportWidget(QOpenGLWidget):
                 self._draw_gizmo_opengl()
         except Exception as e:
             print(f"Error drawing gizmo: {e}")
+    
+    def _draw_gizmo_opengl(self):
+        """Draw gizmo using OpenGL (simplified direct implementation)"""
+        if self.gizmo_mode.value == "translate":
+            self._draw_translate_gizmo()
+        elif self.gizmo_mode.value == "rotate":
+            self._draw_rotate_gizmo()
+        elif self.gizmo_mode.value == "scale":
+            self._draw_scale_gizmo()
+    
+    def _draw_translate_gizmo(self):
+        """Draw translation gizmo (arrows)"""
+        glDisable(GL_LIGHTING)
+        glDisable(GL_DEPTH_TEST)
+        
+        glPushMatrix()
+        glTranslatef(self.gizmo.position[0], self.gizmo.position[1], self.gizmo.position[2])
+        
+        arrow_length = self.gizmo.size
+        arrow_shaft = arrow_length * 0.7
+        arrow_head = arrow_length * 0.3
+        head_width = self.gizmo.size * 0.1
+        
+        # X axis (Red)
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.X else self.gizmo.colors[self.GizmoAxis.X]
+        glColor3f(*color)
+        glLineWidth(3.0)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(arrow_shaft, 0, 0)
+        glEnd()
+        
+        # Y axis (Green)
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.Y else self.gizmo.colors[self.GizmoAxis.Y]
+        glColor3f(*color)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, arrow_shaft, 0)
+        glEnd()
+        
+        # Z axis (Blue)
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.Z else self.gizmo.colors[self.GizmoAxis.Z]
+        glColor3f(*color)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 0, arrow_shaft)
+        glEnd()
+        
+        glLineWidth(1.0)
+        glPopMatrix()
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+    
+    def _draw_rotate_gizmo(self):
+        """Draw rotation gizmo (circles)"""
+        glDisable(GL_LIGHTING)
+        glDisable(GL_DEPTH_TEST)
+        
+        glPushMatrix()
+        glTranslatef(self.gizmo.position[0], self.gizmo.position[1], self.gizmo.position[2])
+        
+        radius = self.gizmo.size
+        segments = 64
+        
+        # X axis circle (Red) - in YZ plane
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.X else self.gizmo.colors[self.GizmoAxis.X]
+        glColor3f(*color)
+        glLineWidth(3.0)
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2.0 * np.pi * i / segments
+            glVertex3f(0, radius * np.cos(angle), radius * np.sin(angle))
+        glEnd()
+        
+        # Y axis circle (Green) - in XZ plane
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.Y else self.gizmo.colors[self.GizmoAxis.Y]
+        glColor3f(*color)
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2.0 * np.pi * i / segments
+            glVertex3f(radius * np.cos(angle), 0, radius * np.sin(angle))
+        glEnd()
+        
+        # Z axis circle (Blue) - in XY plane
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.Z else self.gizmo.colors[self.GizmoAxis.Z]
+        glColor3f(*color)
+        glBegin(GL_LINE_LOOP)
+        for i in range(segments):
+            angle = 2.0 * np.pi * i / segments
+            glVertex3f(radius * np.cos(angle), radius * np.sin(angle), 0)
+        glEnd()
+        
+        glLineWidth(1.0)
+        glPopMatrix()
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+    
+    def _draw_scale_gizmo(self):
+        """Draw scale gizmo (boxes)"""
+        glDisable(GL_LIGHTING)
+        glDisable(GL_DEPTH_TEST)
+        
+        glPushMatrix()
+        glTranslatef(self.gizmo.position[0], self.gizmo.position[1], self.gizmo.position[2])
+        
+        box_size = self.gizmo.size * 0.15
+        
+        # X axis (Red)
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.X else self.gizmo.colors[self.GizmoAxis.X]
+        glColor3f(*color)
+        glLineWidth(3.0)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(self.gizmo.size, 0, 0)
+        glEnd()
+        
+        # Y axis (Green)
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.Y else self.gizmo.colors[self.GizmoAxis.Y]
+        glColor3f(*color)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, self.gizmo.size, 0)
+        glEnd()
+        
+        # Z axis (Blue)
+        color = self.gizmo.highlight_color if self.gizmo.selected_axis == self.gizmo.hover_axis == self.GizmoAxis.Z else self.gizmo.colors[self.GizmoAxis.Z]
+        glColor3f(*color)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 0, self.gizmo.size)
+        glEnd()
+        
+        glLineWidth(1.0)
+        glPopMatrix()
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
         
     def mousePressEvent(self, event):
         """Handle mouse press"""
