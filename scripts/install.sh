@@ -369,6 +369,12 @@ fi
 # No need to install xStage as a package - we'll run it directly as a Python application
 print_status "xStage will run directly from source (no package installation needed)"
 
+# Install jinja2 (required for USD schema generation tools)
+echo ""
+print_status "Installing jinja2 (required for USD build)..."
+pip install --no-cache-dir jinja2
+print_status "jinja2 installed"
+
 # Build USD from source with imaging support (fully open source, no NVIDIA dependencies)
 echo ""
 echo "Building USD from source with imaging support..."
@@ -480,6 +486,8 @@ if [ "$BUILD_USD" = true ]; then
         print_error ""
         print_error "Common issues:"
         print_error "  - Missing build dependencies (check that all required packages are installed)"
+        print_error "  - Missing jinja2 (required for schema generation) - should be installed automatically"
+        print_error "  - Python linking errors (undefined Python symbols) - may need to rebuild Python with shared libraries"
         print_error "  - Insufficient disk space (USD build requires ~5GB)"
         print_error "  - Network issues downloading dependencies"
         print_error "  - Compiler compatibility issues (try with fewer parallel jobs: -j 4)"
