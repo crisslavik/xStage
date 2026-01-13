@@ -109,16 +109,16 @@ class ViewportOverlay(QWidget):
         try:
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             
-            # Set font
-            font = QFont("Monospace", 10)
+            # Set font - larger and more visible
+            font = QFont("Monospace", 11)
             font.setBold(True)
             painter.setFont(font)
             
-            # Background color (semi-transparent dark box)
-            bg_color = QColor(0, 0, 0, 200)
+            # Background color (more opaque dark box for better contrast)
+            bg_color = QColor(20, 20, 20, 230)
             text_color = QColor(255, 255, 255, 255)
-            highlight_color = QColor(100, 150, 255, 255)
-            border_color = QColor(100, 100, 100, 255)
+            highlight_color = QColor(120, 180, 255, 255)
+            border_color = QColor(80, 80, 80, 255)
             
             # Calculate content size first
             content_lines = []
