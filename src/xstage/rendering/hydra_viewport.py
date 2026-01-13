@@ -10,6 +10,14 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QOpenGLContext, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
+# Import OpenGL for clearing and basic operations
+try:
+    from OpenGL.GL import *
+    OPENGL_AVAILABLE = True
+except ImportError:
+    OPENGL_AVAILABLE = False
+    print("Warning: PyOpenGL not available")
+
 try:
     from pxr import Usd, UsdGeom, Gf, UsdImagingGL, Glf, CameraUtil
     USD_AVAILABLE = True
