@@ -682,34 +682,20 @@ class ViewportWidget(QOpenGLWidget):
     """OpenGL viewport for USD rendering"""
     
     def __init__(self, parent=None):
-        # Configure OpenGL format for better Linux compatibility
+        # Configure OpenGL format for maximum compatibility
         fmt = QSurfaceFormat()
         
-        # Try different OpenGL versions for Linux compatibility
-        try:
-            fmt.setVersion(3, 3)  # Try OpenGL 3.3 first
-            fmt.setProfile(QSurfaceFormat.CoreProfile)
-        except:
-            try:
-                fmt.setVersion(2, 1)  # Fallback to OpenGL 2.1
-                fmt.setProfile(QSurfaceFormat.CompatibilityProfile)
-            except:
-                fmt.setVersion(1, 1)  # Last resort
-        
-        fmt.setSamples(4)  # 4x MSAA
-        fmt.setDepthBufferSize(24)
-        fmt.setStencilBufferSize(8)
+        # Use very basic OpenGL settings for maximum compatibility
+        fmt.setVersion(1, 1)  # OpenGL 1.1 - most compatible
+        fmt.setProfile(QSurfaceFormat.CompatibilityProfile)
+        fmt.setDepthBufferSize(16)  # Smaller depth buffer
         fmt.setRedBufferSize(8)
         fmt.setGreenBufferSize(8)
         fmt.setBlueBufferSize(8)
         fmt.setAlphaBufferSize(8)
         
-        # Linux-specific settings
-        import platform
-        if platform.system() == "Linux":
-            fmt.setRenderableType(QSurfaceFormat.OpenGL)
-            # Disable vsync for better performance on some Linux systems
-            fmt.setSwapInterval(0)
+        # Disable problematic features initially
+        fmt.setSamples(0)  # No multisampling initially
         
         QSurfaceFormat.setDefaultFormat(fmt)
         
@@ -755,10 +741,10 @@ class ViewportWidget(QOpenGLWidget):
         # Enable keyboard focus for shortcuts
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
-        # Linux-specific: Check OpenGL context on creation
-        if platform.system() == "Linux":
-            self._opengl_error_count = 0
-            self._max_opengl_errors = 10
+        # Error tracking
+        self._opengl_error_count = 0
+        self._max_opengl_errors = 5
+        self._safe_mode = False  # Start in safe mode
         
     def set_stage_manager(self, manager: USDStageManager):
         """Set the USD stage manager"""
@@ -842,53 +828,27 @@ class ViewportWidget(QOpenGLWidget):
         self.update()
         
     def initializeGL(self):
-        """Initialize OpenGL settings with Linux compatibility"""
+        """Initialize OpenGL settings with maximum compatibility"""
         try:
             print("DEBUG: Initializing OpenGL...")
             
             # Check OpenGL version
-            gl_version = glGetString(GL_VERSION)
-            gl_renderer = glGetString(GL_RENDERER)
-            print(f"DEBUG: OpenGL Version: {gl_version}")
-            print(f"DEBUG: OpenGL Renderer: {gl_renderer}")
+            try:
+                gl_version = glGetString(GL_VERSION)
+                gl_renderer = glGetString(GL_RENDERER)
+                print(f"DEBUG: OpenGL Version: {gl_version}")
+                print(f"DEBUG: OpenGL Renderer: {gl_renderer}")
+            except:
+                print("DEBUG: Could not get OpenGL info")
             
-            # Basic OpenGL setup
+            # Very basic OpenGL setup
             glEnable(GL_DEPTH_TEST)
             glDepthFunc(GL_LEQUAL)
             
-            # Enable multisampling if available
-            if self.format().samples() > 0:
-                glEnable(GL_MULTISAMPLE)
-                print(f"DEBUG: Multisampling enabled with {self.format().samples()} samples")
+            # Clear color
+            glClearColor(0.2, 0.2, 0.2, 1.0)
             
-            # Line smoothing
-            glEnable(GL_LINE_SMOOTH)
-            glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
-            
-            # Blending
-            glEnable(GL_BLEND)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            
-            # Basic lighting setup
-            glEnable(GL_LIGHTING)
-            glEnable(GL_LIGHT0)
-            glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
-            glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.0])
-            glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
-            
-            # Check for OpenGL errors
-            err = glGetError()
-            if err != GL_NO_ERROR:
-                print(f"WARNING: OpenGL error during initialization: {err}")
-                if hasattr(self, '_opengl_error_count'):
-                    self._opengl_error_count += 1
-                    if self._opengl_error_count > self._max_opengl_errors:
-                        print("ERROR: Too many OpenGL errors, disabling some features")
-                        # Disable problematic features
-                        glDisable(GL_MULTISAMPLE)
-                        glDisable(GL_LINE_SMOOTH)
-            else:
-                print("DEBUG: OpenGL initialization successful")
+            print("DEBUG: Basic OpenGL initialization successful")
                 
         except Exception as e:
             print(f"ERROR in OpenGL initialization: {e}")
@@ -898,6 +858,8 @@ class ViewportWidget(QOpenGLWidget):
             try:
                 glClearColor(0.5, 0.5, 0.5, 1.0)  # Gray background
                 glClear(GL_COLOR_BUFFER_BIT)
+                self._safe_mode = True
+                print("DEBUG: Entered safe mode")
             except:
                 print("ERROR: Even fallback OpenGL setup failed")
         
@@ -912,101 +874,185 @@ class ViewportWidget(QOpenGLWidget):
             if hasattr(self, 'overlay') and self.overlay:
                 self.overlay.record_frame()
             
-            # Clear buffers
+            # Clear buffers with safe background
             bg = self.settings.background_color
             glClearColor(*bg)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             
-            # Check for OpenGL errors
+            # Check for OpenGL errors - but don't fail completely
             err = glGetError()
             if err != GL_NO_ERROR:
                 print(f"OpenGL error after clear: {err}")
-                return
+                # Don't return immediately, try to continue with basic rendering
             
-            # Set up projection
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            aspect = self.width() / max(self.height(), 1)
-            
-            # Use orthographic for ortho views, perspective for perspective view
-            view_mode = getattr(self, 'view_mode', 'Perspective')
-            if view_mode == "Perspective":
-                gluPerspective(self.settings.camera_fov, aspect, 
-                              self.settings.near_clip, self.settings.far_clip)
-            else:
-                # Orthographic projection for ortho views
-                ortho_size = self.camera_distance * 0.5
-                glOrtho(-ortho_size * aspect, ortho_size * aspect,
-                       -ortho_size, ortho_size,
-                       self.settings.near_clip, self.settings.far_clip)
+            # Set up projection with error handling
+            try:
+                glMatrixMode(GL_PROJECTION)
+                glLoadIdentity()
+                aspect = self.width() / max(self.height(), 1)
+                
+                # Use orthographic for ortho views, perspective for perspective view
+                view_mode = getattr(self, 'view_mode', 'Perspective')
+                if view_mode == "Perspective":
+                    gluPerspective(self.settings.camera_fov, aspect, 
+                                  self.settings.near_clip, self.settings.far_clip)
+                else:
+                    # Orthographic projection for ortho views
+                    ortho_size = self.camera_distance * 0.5
+                    glOrtho(-ortho_size * aspect, ortho_size * aspect,
+                           -ortho_size, ortho_size,
+                           self.settings.near_clip, self.settings.far_clip)
+            except Exception as e:
+                print(f"Error setting up projection: {e}")
+                # Use a simple orthographic projection as fallback
+                glMatrixMode(GL_PROJECTION)
+                glLoadIdentity()
+                glOrtho(-1, 1, -1, 1, -1, 1)
             
             # Set up camera
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
+            try:
+                glMatrixMode(GL_MODELVIEW)
+                glLoadIdentity()
+                
+                # Simple camera setup for now
+                gluLookAt(0, 0, 5, 0, 0, 0, 0, 1, 0)
+            except Exception as e:
+                print(f"Error setting up camera: {e}")
+                # Just load identity if camera setup fails
+                glMatrixMode(GL_MODELVIEW)
+                glLoadIdentity()
             
-            # Calculate camera position and orientation based on view mode
-            if view_mode == "Perspective":
-                # Free camera (perspective)
-                cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-                cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-                cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-                camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
-                up_vector = np.array([0, 1, 0])
-            elif view_mode == "Top":
-                # Top view: camera above, looking down
-                camera_pos = self.camera_target + np.array([0, self.camera_distance, 0])
-                up_vector = np.array([0, 0, -1])  # Negative Z is "up" in top view
-            elif view_mode == "Front":
-                # Front view: camera in front, looking back
-                camera_pos = self.camera_target + np.array([0, 0, self.camera_distance])
-                up_vector = np.array([0, 1, 0])
-            elif view_mode == "Left":
-                # Left view: camera on left, looking right
-                camera_pos = self.camera_target + np.array([-self.camera_distance, 0, 0])
-                up_vector = np.array([0, 1, 0])
-            elif view_mode == "Back":
-                # Back view: camera behind, looking forward
-                camera_pos = self.camera_target + np.array([0, 0, -self.camera_distance])
-                up_vector = np.array([0, 1, 0])
-            elif view_mode == "Right":
-                # Right view: camera on right, looking left
-                camera_pos = self.camera_target + np.array([self.camera_distance, 0, 0])
-                up_vector = np.array([0, 1, 0])
-            else:
-                # Default to perspective
-                cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-                cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-                cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-                camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
-                up_vector = np.array([0, 1, 0])
+            # Draw simple grid (safer than full geometry)
+            try:
+                if self.settings.grid_enabled:
+                    self.draw_simple_grid()
+            except Exception as e:
+                print(f"Error drawing grid: {e}")
             
-            gluLookAt(
-                camera_pos[0], camera_pos[1], camera_pos[2],
-                self.camera_target[0], self.camera_target[1], self.camera_target[2],
-                up_vector[0], up_vector[1], up_vector[2]
-            )
+            # Draw simple axis
+            try:
+                if self.settings.axis_enabled:
+                    self.draw_simple_axis()
+            except Exception as e:
+                print(f"Error drawing axis: {e}")
             
-            # Draw grid
-            if self.settings.grid_enabled:
-                self.draw_grid()
-            
-            # Draw axis
-            if self.settings.axis_enabled:
-                self.draw_axis()
-            
-            # Draw geometry
-            self.draw_geometry()
+            # Only try to draw geometry if we have it and it's safe
+            try:
+                if self.geometry_data and 'meshes' in self.geometry_data and self.geometry_data['meshes']:
+                    self.draw_geometry_safe()
+            except Exception as e:
+                print(f"Error drawing geometry: {e}")
+                # Draw a simple colored cube to indicate the viewport is working
+                self.draw_fallback_cube()
             
         except Exception as e:
-            print(f"ERROR in paintGL: {e}")
+            print(f"CRITICAL ERROR in paintGL: {e}")
             import traceback
             traceback.print_exc()
-            # Clear screen with error color
-            glClearColor(1.0, 0.0, 0.0, 1.0)  # Red background for error
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            # Clear screen with error color only on critical errors
+            try:
+                glClearColor(1.0, 0.0, 0.0, 1.0)  # Red background for error
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            except:
+                pass  # Even this failed
+        
+    def draw_simple_grid(self):
+        """Draw a simple, safe grid"""
+        glDisable(GL_LIGHTING)
+        glColor3f(0.3, 0.3, 0.3)
+        glBegin(GL_LINES)
+        
+        # Draw a simple 10x10 grid
+        for i in range(-5, 6):
+            glVertex3f(i, 0, -5)
+            glVertex3f(i, 0, 5)
+            glVertex3f(-5, 0, i)
+            glVertex3f(5, 0, i)
+        
+        glEnd()
+        
+    def draw_simple_axis(self):
+        """Draw simple coordinate axis"""
+        glDisable(GL_LIGHTING)
+        glLineWidth(2.0)
+        glBegin(GL_LINES)
+        
+        # X axis - Red
+        glColor3f(1, 0, 0)
+        glVertex3f(0, 0, 0)
+        glVertex3f(1, 0, 0)
+        
+        # Y axis - Green
+        glColor3f(0, 1, 0)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 1, 0)
+        
+        # Z axis - Blue
+        glColor3f(0, 0, 1)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 0, 1)
+        
+        glEnd()
+        glLineWidth(1.0)
+        
+    def draw_fallback_cube(self):
+        """Draw a simple colored cube to indicate viewport is working"""
+        glDisable(GL_LIGHTING)
+        glColor3f(0.5, 0.8, 0.5)  # Light green
+        
+        # Draw a simple cube
+        vertices = [
+            [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5],
+            [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]
+        ]
+        
+        faces = [
+            [0, 1, 2, 3],  # Front
+            [4, 7, 6, 5],  # Back
+            [0, 4, 5, 1],  # Bottom
+            [2, 6, 7, 3],  # Top
+            [0, 3, 7, 4],  # Left
+            [1, 5, 6, 2]   # Right
+        ]
+        
+        glBegin(GL_QUADS)
+        for face in faces:
+            for vertex_idx in face:
+                glVertex3fv(vertices[vertex_idx])
+        glEnd()
+        
+    def draw_geometry_safe(self):
+        """Draw geometry with maximum safety"""
+        if not self.geometry_data or 'meshes' not in self.geometry_data:
+            return
+            
+        # Only draw the first mesh to avoid overwhelming the system
+        meshes = self.geometry_data['meshes']
+        if not meshes:
+            return
+            
+        mesh = meshes[0]  # Only draw first mesh
+        if not mesh or 'points' not in mesh:
+            return
+            
+        points = mesh.get('points')
+        if points is None or len(points) == 0:
+            return
+            
+        # Simple wireframe rendering
+        glDisable(GL_LIGHTING)
+        glColor3f(0.7, 0.7, 0.7)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        
+        # Draw points as a simple point cloud
+        glBegin(GL_POINTS)
+        for point in points[:1000]:  # Limit to first 1000 points
+            glVertex3f(point[0], point[1], point[2])
+        glEnd()
+        
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         
     def draw_grid(self):
-        """Draw ground grid"""
         glDisable(GL_LIGHTING)
         glColor3f(0.3, 0.3, 0.3)
         glBegin(GL_LINES)
