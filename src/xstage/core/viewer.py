@@ -682,11 +682,35 @@ class ViewportWidget(QOpenGLWidget):
     """OpenGL viewport for USD rendering"""
     
     def __init__(self, parent=None):
-        # Configure OpenGL format for compatibility profile (supports deprecated functions)
+        # Configure OpenGL format for better Linux compatibility
         fmt = QSurfaceFormat()
-        fmt.setVersion(2, 1)  # OpenGL 2.1
-        fmt.setProfile(QSurfaceFormat.CompatibilityProfile)  # Compatibility profile (not Core)
+        
+        # Try different OpenGL versions for Linux compatibility
+        try:
+            fmt.setVersion(3, 3)  # Try OpenGL 3.3 first
+            fmt.setProfile(QSurfaceFormat.CoreProfile)
+        except:
+            try:
+                fmt.setVersion(2, 1)  # Fallback to OpenGL 2.1
+                fmt.setProfile(QSurfaceFormat.CompatibilityProfile)
+            except:
+                fmt.setVersion(1, 1)  # Last resort
+        
         fmt.setSamples(4)  # 4x MSAA
+        fmt.setDepthBufferSize(24)
+        fmt.setStencilBufferSize(8)
+        fmt.setRedBufferSize(8)
+        fmt.setGreenBufferSize(8)
+        fmt.setBlueBufferSize(8)
+        fmt.setAlphaBufferSize(8)
+        
+        # Linux-specific settings
+        import platform
+        if platform.system() == "Linux":
+            fmt.setRenderableType(QSurfaceFormat.OpenGL)
+            # Disable vsync for better performance on some Linux systems
+            fmt.setSwapInterval(0)
+        
         QSurfaceFormat.setDefaultFormat(fmt)
         
         super().__init__(parent)
@@ -717,13 +741,24 @@ class ViewportWidget(QOpenGLWidget):
         self.is_gizmo_dragging = False
         
         # Gizmo
-        from ..rendering.gizmo import TransformGizmo, GizmoMode, GizmoAxis
-        self.gizmo = TransformGizmo()
-        self.gizmo_mode = GizmoMode.TRANSLATE
-        self.GizmoAxis = GizmoAxis  # Store for use in drawing methods
+        try:
+            from ..rendering.gizmo import TransformGizmo, GizmoMode, GizmoAxis
+            self.gizmo = TransformGizmo()
+            self.gizmo_mode = GizmoMode.TRANSLATE
+            self.GizmoAxis = GizmoAxis  # Store for use in drawing methods
+        except ImportError:
+            print("WARNING: Gizmo module not available")
+            self.gizmo = None
+            self.gizmo_mode = None
+            self.GizmoAxis = None
         
         # Enable keyboard focus for shortcuts
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+        # Linux-specific: Check OpenGL context on creation
+        if platform.system() == "Linux":
+            self._opengl_error_count = 0
+            self._max_opengl_errors = 10
         
     def set_stage_manager(self, manager: USDStageManager):
         """Set the USD stage manager"""
@@ -731,7 +766,11 @@ class ViewportWidget(QOpenGLWidget):
         
     def update_geometry(self, time_code: float):
         """Update geometry for current time"""
-        if self.stage_manager:
+        if not self.stage_manager:
+            print("DEBUG: No stage_manager set in viewport")
+            return
+            
+        try:
             self.geometry_data = self.stage_manager.get_geometry_data(time_code)
             print(f"DEBUG: update_geometry called. Meshes: {len(self.geometry_data.get('meshes', []))}, "
                   f"Cameras: {len(self.geometry_data.get('cameras', []))}, "
@@ -747,8 +786,13 @@ class ViewportWidget(QOpenGLWidget):
                 print(f"DEBUG: Not auto-framing. auto_frame={self.settings.auto_frame}, "
                       f"has_bounds={'bounds' in self.geometry_data}")
                 
-            self.update()
-            print(f"DEBUG: Viewport update() called")
+            # Use QTimer.singleShot for safer update
+            QTimer.singleShot(0, self.update)
+            print(f"DEBUG: Viewport update scheduled")
+        except Exception as e:
+            print(f"ERROR in update_geometry: {e}")
+            import traceback
+            traceback.print_exc()
     
     def frame_bounds(self, bounds: Dict):
         """Frame camera to fit bounds"""
@@ -798,20 +842,64 @@ class ViewportWidget(QOpenGLWidget):
         self.update()
         
     def initializeGL(self):
-        """Initialize OpenGL settings"""
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_MULTISAMPLE)
-        glEnable(GL_LINE_SMOOTH)
-        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
-        # Lighting
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
-        glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
-        glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.0])
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
+        """Initialize OpenGL settings with Linux compatibility"""
+        try:
+            print("DEBUG: Initializing OpenGL...")
+            
+            # Check OpenGL version
+            gl_version = glGetString(GL_VERSION)
+            gl_renderer = glGetString(GL_RENDERER)
+            print(f"DEBUG: OpenGL Version: {gl_version}")
+            print(f"DEBUG: OpenGL Renderer: {gl_renderer}")
+            
+            # Basic OpenGL setup
+            glEnable(GL_DEPTH_TEST)
+            glDepthFunc(GL_LEQUAL)
+            
+            # Enable multisampling if available
+            if self.format().samples() > 0:
+                glEnable(GL_MULTISAMPLE)
+                print(f"DEBUG: Multisampling enabled with {self.format().samples()} samples")
+            
+            # Line smoothing
+            glEnable(GL_LINE_SMOOTH)
+            glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
+            
+            # Blending
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            
+            # Basic lighting setup
+            glEnable(GL_LIGHTING)
+            glEnable(GL_LIGHT0)
+            glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
+            glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.0])
+            glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
+            
+            # Check for OpenGL errors
+            err = glGetError()
+            if err != GL_NO_ERROR:
+                print(f"WARNING: OpenGL error during initialization: {err}")
+                if hasattr(self, '_opengl_error_count'):
+                    self._opengl_error_count += 1
+                    if self._opengl_error_count > self._max_opengl_errors:
+                        print("ERROR: Too many OpenGL errors, disabling some features")
+                        # Disable problematic features
+                        glDisable(GL_MULTISAMPLE)
+                        glDisable(GL_LINE_SMOOTH)
+            else:
+                print("DEBUG: OpenGL initialization successful")
+                
+        except Exception as e:
+            print(f"ERROR in OpenGL initialization: {e}")
+            import traceback
+            traceback.print_exc()
+            # Set a safe fallback state
+            try:
+                glClearColor(0.5, 0.5, 0.5, 1.0)  # Gray background
+                glClear(GL_COLOR_BUFFER_BIT)
+            except:
+                print("ERROR: Even fallback OpenGL setup failed")
         
     def resizeGL(self, w, h):
         """Handle viewport resize"""
@@ -819,88 +907,103 @@ class ViewportWidget(QOpenGLWidget):
         
     def paintGL(self):
         """Render the scene"""
-        # Record frame for FPS calculation
-        if hasattr(self, 'overlay') and self.overlay:
-            self.overlay.record_frame()
-        
-        # Clear buffers
-        bg = self.settings.background_color
-        glClearColor(*bg)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        
-        # Set up projection
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        aspect = self.width() / max(self.height(), 1)
-        
-        # Use orthographic for ortho views, perspective for perspective view
-        view_mode = getattr(self, 'view_mode', 'Perspective')
-        if view_mode == "Perspective":
-            gluPerspective(self.settings.camera_fov, aspect, 
-                          self.settings.near_clip, self.settings.far_clip)
-        else:
-            # Orthographic projection for ortho views
-            ortho_size = self.camera_distance * 0.5
-            glOrtho(-ortho_size * aspect, ortho_size * aspect,
-                   -ortho_size, ortho_size,
-                   self.settings.near_clip, self.settings.far_clip)
-        
-        # Set up camera
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
-        
-        # Calculate camera position and orientation based on view mode
-        if view_mode == "Perspective":
-            # Free camera (perspective)
-            cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-            cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-            cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-            camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
-            up_vector = np.array([0, 1, 0])
-        elif view_mode == "Top":
-            # Top view: camera above, looking down
-            camera_pos = self.camera_target + np.array([0, self.camera_distance, 0])
-            up_vector = np.array([0, 0, -1])  # Negative Z is "up" in top view
-        elif view_mode == "Front":
-            # Front view: camera in front, looking back
-            camera_pos = self.camera_target + np.array([0, 0, self.camera_distance])
-            up_vector = np.array([0, 1, 0])
-        elif view_mode == "Left":
-            # Left view: camera on left, looking right
-            camera_pos = self.camera_target + np.array([-self.camera_distance, 0, 0])
-            up_vector = np.array([0, 1, 0])
-        elif view_mode == "Back":
-            # Back view: camera behind, looking forward
-            camera_pos = self.camera_target + np.array([0, 0, -self.camera_distance])
-            up_vector = np.array([0, 1, 0])
-        elif view_mode == "Right":
-            # Right view: camera on right, looking left
-            camera_pos = self.camera_target + np.array([self.camera_distance, 0, 0])
-            up_vector = np.array([0, 1, 0])
-        else:
-            # Default to perspective
-            cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-            cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-            cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-            camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
-            up_vector = np.array([0, 1, 0])
-        
-        gluLookAt(
-            camera_pos[0], camera_pos[1], camera_pos[2],
-            self.camera_target[0], self.camera_target[1], self.camera_target[2],
-            up_vector[0], up_vector[1], up_vector[2]
-        )
-        
-        # Draw grid
-        if self.settings.grid_enabled:
-            self.draw_grid()
-        
-        # Draw axis
-        if self.settings.axis_enabled:
-            self.draw_axis()
-        
-        # Draw geometry
-        self.draw_geometry()
+        try:
+            # Record frame for FPS calculation
+            if hasattr(self, 'overlay') and self.overlay:
+                self.overlay.record_frame()
+            
+            # Clear buffers
+            bg = self.settings.background_color
+            glClearColor(*bg)
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            
+            # Check for OpenGL errors
+            err = glGetError()
+            if err != GL_NO_ERROR:
+                print(f"OpenGL error after clear: {err}")
+                return
+            
+            # Set up projection
+            glMatrixMode(GL_PROJECTION)
+            glLoadIdentity()
+            aspect = self.width() / max(self.height(), 1)
+            
+            # Use orthographic for ortho views, perspective for perspective view
+            view_mode = getattr(self, 'view_mode', 'Perspective')
+            if view_mode == "Perspective":
+                gluPerspective(self.settings.camera_fov, aspect, 
+                              self.settings.near_clip, self.settings.far_clip)
+            else:
+                # Orthographic projection for ortho views
+                ortho_size = self.camera_distance * 0.5
+                glOrtho(-ortho_size * aspect, ortho_size * aspect,
+                       -ortho_size, ortho_size,
+                       self.settings.near_clip, self.settings.far_clip)
+            
+            # Set up camera
+            glMatrixMode(GL_MODELVIEW)
+            glLoadIdentity()
+            
+            # Calculate camera position and orientation based on view mode
+            if view_mode == "Perspective":
+                # Free camera (perspective)
+                cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+                cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+                cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+                camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
+                up_vector = np.array([0, 1, 0])
+            elif view_mode == "Top":
+                # Top view: camera above, looking down
+                camera_pos = self.camera_target + np.array([0, self.camera_distance, 0])
+                up_vector = np.array([0, 0, -1])  # Negative Z is "up" in top view
+            elif view_mode == "Front":
+                # Front view: camera in front, looking back
+                camera_pos = self.camera_target + np.array([0, 0, self.camera_distance])
+                up_vector = np.array([0, 1, 0])
+            elif view_mode == "Left":
+                # Left view: camera on left, looking right
+                camera_pos = self.camera_target + np.array([-self.camera_distance, 0, 0])
+                up_vector = np.array([0, 1, 0])
+            elif view_mode == "Back":
+                # Back view: camera behind, looking forward
+                camera_pos = self.camera_target + np.array([0, 0, -self.camera_distance])
+                up_vector = np.array([0, 1, 0])
+            elif view_mode == "Right":
+                # Right view: camera on right, looking left
+                camera_pos = self.camera_target + np.array([self.camera_distance, 0, 0])
+                up_vector = np.array([0, 1, 0])
+            else:
+                # Default to perspective
+                cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+                cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
+                cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
+                camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
+                up_vector = np.array([0, 1, 0])
+            
+            gluLookAt(
+                camera_pos[0], camera_pos[1], camera_pos[2],
+                self.camera_target[0], self.camera_target[1], self.camera_target[2],
+                up_vector[0], up_vector[1], up_vector[2]
+            )
+            
+            # Draw grid
+            if self.settings.grid_enabled:
+                self.draw_grid()
+            
+            # Draw axis
+            if self.settings.axis_enabled:
+                self.draw_axis()
+            
+            # Draw geometry
+            self.draw_geometry()
+            
+        except Exception as e:
+            print(f"ERROR in paintGL: {e}")
+            import traceback
+            traceback.print_exc()
+            # Clear screen with error color
+            glClearColor(1.0, 0.0, 0.0, 1.0)  # Red background for error
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
     def draw_grid(self):
         """Draw ground grid"""
@@ -977,42 +1080,59 @@ class ViewportWidget(QOpenGLWidget):
     def draw_geometry(self):
         """Draw USD geometry"""
         if not self.geometry_data or 'meshes' not in self.geometry_data:
-            # Debug: print if geometry data is missing
-            if not self.geometry_data:
-                print("DEBUG: No geometry_data in viewport")
-            elif 'meshes' not in self.geometry_data:
-                print(f"DEBUG: geometry_data missing 'meshes' key. Keys: {list(self.geometry_data.keys())}")
+            # Only print once per second to avoid spam
+            current_time = QApplication.instance().elapsedTimer() if QApplication.instance() else 0
+            if not hasattr(self, '_last_empty_geometry_print') or current_time - self._last_empty_geometry_print > 1000:
+                if not self.geometry_data:
+                    print("DEBUG: No geometry_data in viewport")
+                elif 'meshes' not in self.geometry_data:
+                    print(f"DEBUG: geometry_data missing 'meshes' key. Keys: {list(self.geometry_data.keys())}")
+                self._last_empty_geometry_print = current_time
             return
         
         if not self.geometry_data['meshes']:
-            # No meshes to draw
-            print(f"DEBUG: geometry_data['meshes'] is empty. Total meshes: {len(self.geometry_data.get('meshes', []))}")
+            # Only print once per second to avoid spam
+            current_time = QApplication.instance().elapsedTimer() if QApplication.instance() else 0
+            if not hasattr(self, '_last_no_meshes_print') or current_time - self._last_no_meshes_print > 1000:
+                print(f"DEBUG: geometry_data['meshes'] is empty. Total meshes: {len(self.geometry_data.get('meshes', []))}")
+                self._last_no_meshes_print = current_time
             return
         
-        # Don't print every frame - too verbose
-        # print(f"DEBUG: Drawing {len(self.geometry_data['meshes'])} meshes")
-        
-        glEnable(GL_LIGHTING)
-        glEnable(GL_DEPTH_TEST)
-        glDepthFunc(GL_LEQUAL)
-        glEnable(GL_NORMALIZE)  # Normalize normals for proper lighting
-        
-        # Brighter material properties for better visibility
-        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, [0.4, 0.4, 0.4, 1.0])  # Brighter ambient
-        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [0.9, 0.9, 0.9, 1.0])  # Brighter diffuse
-        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.5, 0.5, 0.5, 1.0])  # Brighter specular
-        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 64.0)
-        
-        # Enable color material for better visibility
-        glEnable(GL_COLOR_MATERIAL)
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-        glColor3f(0.8, 0.8, 0.8)  # Default gray color
-        
-        for mesh in self.geometry_data['meshes']:
-            if mesh and 'points' in mesh and len(mesh['points']) > 0:
-                self.draw_mesh(mesh)
-        
-        glDisable(GL_COLOR_MATERIAL)
+        try:
+            glEnable(GL_LIGHTING)
+            glEnable(GL_DEPTH_TEST)
+            glDepthFunc(GL_LEQUAL)
+            glEnable(GL_NORMALIZE)  # Normalize normals for proper lighting
+            
+            # Brighter material properties for better visibility
+            glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, [0.4, 0.4, 0.4, 1.0])  # Brighter ambient
+            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, [0.9, 0.9, 0.9, 1.0])  # Brighter diffuse
+            glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.5, 0.5, 0.5, 1.0])  # Brighter specular
+            glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 64.0)
+            
+            # Enable color material for better visibility
+            glEnable(GL_COLOR_MATERIAL)
+            glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+            glColor3f(0.8, 0.8, 0.8)  # Default gray color
+            
+            mesh_count = 0
+            for mesh in self.geometry_data['meshes']:
+                if mesh and 'points' in mesh and len(mesh['points']) > 0:
+                    self.draw_mesh(mesh)
+                    mesh_count += 1
+            
+            # Only log mesh count occasionally
+            current_time = QApplication.instance().elapsedTimer() if QApplication.instance() else 0
+            if not hasattr(self, '_last_mesh_count_print') or current_time - self._last_mesh_count_print > 2000:
+                print(f"DEBUG: Drew {mesh_count} meshes")
+                self._last_mesh_count_print = current_time
+            
+            glDisable(GL_COLOR_MATERIAL)
+            
+        except Exception as e:
+            print(f"ERROR in draw_geometry: {e}")
+            import traceback
+            traceback.print_exc()
     
     def draw_mesh(self, mesh: Dict):
         """Draw a single mesh"""
@@ -1326,7 +1446,7 @@ class ViewportWidget(QOpenGLWidget):
         elif self.is_rotating:
             self.camera_rotation_y += dx * 0.5
             self.camera_rotation_x = np.clip(self.camera_rotation_x + dy * 0.5, -89, 89)
-            self.update()
+            QTimer.singleShot(0, self.update)
             
         elif self.is_panning:
             # Pan camera target
@@ -1337,7 +1457,7 @@ class ViewportWidget(QOpenGLWidget):
             
             self.camera_target -= right * dx * pan_speed
             self.camera_target += up * dy * pan_speed
-            self.update()
+            QTimer.singleShot(0, self.update)
             
         self.last_mouse_pos = pos
     
@@ -1396,7 +1516,7 @@ class ViewportWidget(QOpenGLWidget):
             self.camera_distance *= (1.0 + zoom_factor)
             
         self.camera_distance = np.clip(self.camera_distance, 0.1, 1000.0)
-        self.update()
+        QTimer.singleShot(0, self.update)
     
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
@@ -2201,9 +2321,8 @@ class USDViewerWindow(QMainWindow):
                 print("DEBUG: Using OpenGL viewport")
                 print(f"DEBUG: Viewport stage_manager: {self.viewport.stage_manager is not None}")
                 self.viewport.update_geometry(float(start))
-                # Force a repaint
-                self.viewport.update()
-                QApplication.processEvents()  # Process events to ensure update happens
+                # Use QTimer for safer update instead of immediate update()
+                QTimer.singleShot(100, self.viewport.update)
             
             # Update hierarchy
             self.update_hierarchy()
