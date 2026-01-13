@@ -105,8 +105,11 @@ class HydraViewportWidget(QOpenGLWidget):
             self.makeCurrent()
             
             # Initialize GLF (GL Framework) - required for Storm
-            if Glf:
+            # Note: GlewInit is not available in pip-installed USD
+            if Glf and hasattr(Glf, 'GlewInit'):
                 Glf.GlewInit()
+            elif Glf:
+                print("⚠️  Glf.GlewInit not available (pip-installed USD)")
             
             # Create Hydra engine
             self.engine = UsdImagingGL.Engine()

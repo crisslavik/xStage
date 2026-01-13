@@ -1107,7 +1107,8 @@ class ViewportWidget(QOpenGLWidget):
         """Draw USD geometry"""
         if not self.geometry_data or 'meshes' not in self.geometry_data:
             # Only print once per second to avoid spam
-            current_time = QApplication.instance().elapsedTimer() if QApplication.instance() else 0
+            import time
+            current_time = int(time.time() * 1000)  # milliseconds
             if not hasattr(self, '_last_empty_geometry_print') or current_time - self._last_empty_geometry_print > 1000:
                 if not self.geometry_data:
                     print("DEBUG: No geometry_data in viewport")
@@ -1118,7 +1119,8 @@ class ViewportWidget(QOpenGLWidget):
         
         if not self.geometry_data['meshes']:
             # Only print once per second to avoid spam
-            current_time = QApplication.instance().elapsedTimer() if QApplication.instance() else 0
+            import time
+            current_time = int(time.time() * 1000)  # milliseconds
             if not hasattr(self, '_last_no_meshes_print') or current_time - self._last_no_meshes_print > 1000:
                 print(f"DEBUG: geometry_data['meshes'] is empty. Total meshes: {len(self.geometry_data.get('meshes', []))}")
                 self._last_no_meshes_print = current_time
@@ -1148,7 +1150,8 @@ class ViewportWidget(QOpenGLWidget):
                     mesh_count += 1
             
             # Only log mesh count occasionally
-            current_time = QApplication.instance().elapsedTimer() if QApplication.instance() else 0
+            import time
+            current_time = int(time.time() * 1000)  # milliseconds
             if not hasattr(self, '_last_mesh_count_print') or current_time - self._last_mesh_count_print > 2000:
                 print(f"DEBUG: Drew {mesh_count} meshes")
                 self._last_mesh_count_print = current_time
