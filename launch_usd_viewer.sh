@@ -5,6 +5,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/.xstage_venv"
+PYTHON_DIR="${SCRIPT_DIR}/.xstage_python"
 
 # Check if virtual environment exists
 if [ ! -d "$VENV_DIR" ]; then
@@ -13,15 +14,21 @@ if [ ! -d "$VENV_DIR" ]; then
     exit 1
 fi
 
+# Set up Python 3.11 library path FIRST (before activating venv)
+# This is required for the Python interpreter to find libpython3.11.so
+if [ -d "$PYTHON_DIR/lib" ]; then
+    export LD_LIBRARY_PATH="$PYTHON_DIR/lib:${LD_LIBRARY_PATH:-}"
+fi
+
 # Activate virtual environment (self-contained, no system packages)
 source "$VENV_DIR/bin/activate"
 
 # Set up USD environment (from built USD with imaging support)
 USD_INSTALL_DIR="${SCRIPT_DIR}/.xstage_usd"
 if [ -d "$USD_INSTALL_DIR" ]; then
-    export PXR_PLUGINPATH_NAME="$USD_INSTALL_DIR/plugin:$PXR_PLUGINPATH_NAME"
+    export PXR_PLUGINPATH_NAME="$USD_INSTALL_DIR/plugin:${PXR_PLUGINPATH_NAME:-}"
     export LD_LIBRARY_PATH="$USD_INSTALL_DIR/lib:$LD_LIBRARY_PATH"
-    export PYTHONPATH="$USD_INSTALL_DIR/lib/python:${PYTHONPATH}"
+    export PYTHONPATH="$USD_INSTALL_DIR/lib/python:${PYTHONPATH:-}"
 fi
 
 # Set PYTHONPATH to include src directory so imports work
