@@ -203,10 +203,10 @@ class HydraViewportWidget(QOpenGLWidget):
                 )
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             
-            # Set viewport size
+            # Set viewport size - USD 25.11+ uses GfVec4d(x, y, width, height)
             width = self.width()
             height = self.height()
-            self.engine.SetRenderViewport(Gf.Rect2i(Gf.Vec2i(0, 0), width, height))
+            self.engine.SetRenderViewport(Gf.Vec4d(0, 0, width, height))
             
             # Compute camera matrices
             view_matrix, projection_matrix = self._compute_camera_matrices()

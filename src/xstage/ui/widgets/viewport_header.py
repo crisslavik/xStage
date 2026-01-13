@@ -175,7 +175,15 @@ class ViewportHeader(QWidget):
     
     def update_camera_list(self):
         """Update camera dropdown with USD cameras"""
-        self.camera_combo.clear()
+        # Check if widget still exists before accessing
+        if not self.camera_combo or not hasattr(self.camera_combo, 'clear'):
+            return
+        
+        try:
+            self.camera_combo.clear()
+        except RuntimeError:
+            # Widget already deleted
+            return
         
         # Always add Perspective (free camera)
         self.camera_combo.addItem("Perspective", "Perspective")
