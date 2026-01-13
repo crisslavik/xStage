@@ -1684,35 +1684,22 @@ class USDViewerWindow(QMainWindow):
         
         try:
             from ..rendering.hydra_viewport import HydraViewportWidget
-            # Check if UsdImagingGL is actually available
-            try:
-                from pxr import UsdImagingGL
-                # UsdImagingGL is available, create Hydra viewport
-                self.hydra_viewport = HydraViewportWidget()
+            # Check if CameraUtil.Frustum is available (indicates full imaging support)
+            from pxr import CameraUtil
+            if not hasattr(CameraUtil, 'Frustum'):
+                raise ImportError("CameraUtil.Frustum not available - pip USD lacks full imaging support")
+            
+            if HydraViewportWidget:
+                self.hydra_viewport = HydraViewportWidget(self)
                 self.hydra_viewport.set_stage_manager(self.stage_manager)
                 # Add Hydra viewport to container
                 viewport_layout.addWidget(self.hydra_viewport)
-                self.use_hydra = True
-                self.statusBar().showMessage("Using Hydra 2.0 rendering", 3000)
-            except (ImportError, Exception) as e:
-                # UsdImagingGL not available or failed to initialize, use OpenGL fallback
-                print(f"Hydra 2.0 viewport is not available: {e}")
-                print("Using OpenGL fallback")
-                print()
-                print("NOTE: The 'usd-core' package from PyPI doesn't include UsdImagingGL.")
-                print("      xStage will use OpenGL fallback rendering, which works for basic")
-                print("      viewing but lacks advanced features (materials, lighting, etc.).")
-                print()
-                print("      For full USD rendering support, install a complete USD build with")
-                print("      imaging support. See docs/USD_RENDERING_EXPLANATION.md for details.")
-                print()
-                self.hydra_viewport = None
-                viewport_layout.addWidget(self.viewport)
-                self.use_hydra = False
+                # Don't enable by default - user can toggle it via menu
+                self.statusBar().showMessage("Hydra 2.0 available (toggle in View menu)", 3000)
         except (ImportError, Exception) as e:
-            # Hydra viewport class not available or failed to create
-            print(f"Hydra 2.0 viewport is not available: {e}")
-            print("Using OpenGL fallback")
+            # Hydra viewport not available - use OpenGL fallback
+            print(f"ℹ️  Hydra 2.0 not available: {e}")
+            print("   Using OpenGL fallback rendering (fully functional)")
             self.hydra_viewport = None
             viewport_layout.addWidget(self.viewport)
             self.use_hydra = False
