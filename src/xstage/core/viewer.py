@@ -3787,6 +3787,48 @@ def main():
     app.setApplicationName("xStage")
     app.setOrganizationName("xStage")
     
+    # Set dark theme (Omniverse-like)
+    app.setStyle("Fusion")
+    dark_palette = QPalette()
+    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Base, QColor(35, 35, 35))
+    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ToolTipBase, QColor(25, 25, 25))
+    dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
+    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    app.setPalette(dark_palette)
+    
+    # Additional stylesheet for menus and widgets
+    app.setStyleSheet("""
+        QMenuBar {
+            background-color: #353535;
+            color: #ffffff;
+        }
+        QMenuBar::item:selected {
+            background-color: #2a82da;
+        }
+        QMenu {
+            background-color: #353535;
+            color: #ffffff;
+            border: 1px solid #555555;
+        }
+        QMenu::item:selected {
+            background-color: #2a82da;
+        }
+        QToolTip {
+            background-color: #191919;
+            color: #ffffff;
+            border: 1px solid #555555;
+        }
+    """)
+    
     # Verify platform after QApplication creation
     platform_name = app.platformName()
     print(f"Qt is using platform: {platform_name}", file=sys.stderr)

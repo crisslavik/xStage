@@ -87,12 +87,13 @@ class HydraViewportWidget(QOpenGLWidget):
     def _setup_opengl_context(self):
         """Configure OpenGL context for Hydra"""
         format = QSurfaceFormat()
-        format.setVersion(4, 1)  # OpenGL 4.1 minimum for Hydra
+        format.setVersion(4, 5)  # OpenGL 4.5 required for Storm renderer
         format.setProfile(QSurfaceFormat.CoreProfile)
         format.setDepthBufferSize(24)
         format.setStencilBufferSize(8)
         format.setSamples(4)  # Multisampling
         format.setSwapBehavior(QSurfaceFormat.DoubleBuffer)
+        QSurfaceFormat.setDefaultFormat(format)  # Set as default
         self.setFormat(format)
     
     def initializeGL(self):
@@ -111,30 +112,36 @@ class HydraViewportWidget(QOpenGLWidget):
             elif Glf:
                 print("⚠️  Glf.GlewInit not available (pip-installed USD)")
             
-            # Create Hydra engine
-            self.engine = UsdImagingGL.Engine()
-            
-            # CRITICAL: Enable Scene Index (Hydra 2.0 requirement)
+            # CRITICAL: Enable Scene Index BEFORE creating engine (Hydra 2.0 requirement)
             try:
-                self.engine.SetEnableSceneIndex(True)
-                print("✅ Hydra 2.0 Scene Index enabled")
+                if hasattr(UsdImagingGL.Engine, 'SetEnableSceneIndex'):
+                    UsdImagingGL.Engine.SetEnableSceneIndex(True)
+                    print("✅ Hydra 2.0 Scene Index enabled (static)")
             except Exception as e:
-                print(f"⚠️  Scene Index enable failed (may be Hydra 1.0): {e}")
+                print(f"⚠️  Scene Index enable failed: {e}")
+            
+            # Create Hydra engine AFTER enabling scene index
+            self.engine = UsdImagingGL.Engine()
             
             # CRITICAL: Set Storm renderer explicitly (Hydra 2.0 GPU renderer)
             try:
                 available_renderers = self.engine.GetRendererPlugins()
                 print(f"Available renderers: {available_renderers}")
                 
-                if 'HdStormRendererPlugin' in available_renderers:
-                    self.engine.SetRendererPlugin('HdStormRendererPlugin')
-                    print("✅ Storm renderer (Hydra 2.0 GPU) enabled")
-                else:
-                    print("⚠️  Storm renderer not available - using default")
-                    if available_renderers:
+                if available_renderers:
+                    if 'HdStormRendererPlugin' in available_renderers:
+                        self.engine.SetRendererPlugin('HdStormRendererPlugin')
+                        print("✅ Storm renderer (Hydra 2.0 GPU) enabled")
+                    else:
+                        # Use first available renderer
                         self.engine.SetRendererPlugin(available_renderers[0])
+                        print(f"✅ Using renderer: {available_renderers[0]}")
+                else:
+                    print("❌ No renderer plugins found - check USD installation")
+                    raise RuntimeError("No Hydra renderer plugins available")
             except Exception as e:
-                print(f"⚠️  Renderer plugin selection failed: {e}")
+                print(f"❌ Renderer plugin selection failed: {e}")
+                raise
             
             # Get renderer (for verification)
             try:
