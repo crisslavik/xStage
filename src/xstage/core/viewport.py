@@ -156,6 +156,15 @@ class ViewportWidget(QOpenGLWidget):
     def initializeGL(self):
         """Initialize OpenGL settings"""
         glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LESS)
+        
+        # Enable backface culling for better performance and correct rendering
+        glEnable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
+        glFrontFace(GL_CCW)
+        
+        # Enable automatic normal normalization (important for scaled geometry)
+        glEnable(GL_NORMALIZE)
         
         if self.multisample_enabled:
             glEnable(GL_MULTISAMPLE)
@@ -165,12 +174,24 @@ class ViewportWidget(QOpenGLWidget):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        # Lighting
+        # Two-sided lighting for better visibility
+        glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE)
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
+        
+        # Primary light (key light from upper-right-front)
         glEnable(GL_LIGHTING)
         glEnable(GL_LIGHT0)
         glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
-        glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.0])
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
+        glLightfv(GL_LIGHT0, GL_AMBIENT, [0.1, 0.1, 0.1, 1.0])
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.8, 0.8, 0.8, 1.0])
+        glLightfv(GL_LIGHT0, GL_SPECULAR, [0.5, 0.5, 0.5, 1.0])
+        
+        # Secondary light (fill light from lower-left-back)
+        glEnable(GL_LIGHT1)
+        glLightfv(GL_LIGHT1, GL_POSITION, [-1.0, -0.5, -1.0, 0.0])
+        glLightfv(GL_LIGHT1, GL_AMBIENT, [0.0, 0.0, 0.0, 1.0])
+        glLightfv(GL_LIGHT1, GL_DIFFUSE, [0.3, 0.3, 0.35, 1.0])
+        glLightfv(GL_LIGHT1, GL_SPECULAR, [0.0, 0.0, 0.0, 1.0])
         
     def resizeGL(self, w, h):
         """Handle viewport resize"""
@@ -212,6 +233,10 @@ class ViewportWidget(QOpenGLWidget):
             self.camera_target[0], self.camera_target[1], self.camera_target[2],
             0, 1, 0
         )
+        
+        # Update light positions in world space (after camera transform)
+        glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
+        glLightfv(GL_LIGHT1, GL_POSITION, [-1.0, -0.5, -1.0, 0.0])
         
         # Draw grid with measurements (like Houdini)
         if self.grid_enabled:
