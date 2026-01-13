@@ -2,8 +2,7 @@
 Core functionality
 """
 
-from .viewer import USDViewerWindow, ViewerSettings, USDStageManager
-from .viewport import ViewportWidget
+from .viewer import USDViewerWindow, ViewerSettings, USDStageManager, ViewportWidget
 
 __all__ = [
     "USDViewerWindow",

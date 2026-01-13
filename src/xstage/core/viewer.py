@@ -775,17 +775,29 @@ class ViewportWidget(QOpenGLWidget):
         size = np.array(bounds['size'])
         max_size = np.max(size)
         
+        # Get up_axis and meters_per_unit from geometry_data
+        up_axis = self.geometry_data.get('up_axis', 'Y') if self.geometry_data else 'Y'
+        meters_per_unit = self.geometry_data.get('meters_per_unit', 0.01) if self.geometry_data else 0.01
+        
+        # Convert to meters
+        center = center * meters_per_unit
+        max_size = max_size * meters_per_unit
+        
+        # If Z-up, swap Y and Z for camera target (since we rotate geometry)
+        if up_axis == 'Z':
+            center = np.array([center[0], center[2], -center[1]])
+        
         # Set camera to view entire bounds with better distance calculation
         self.camera_target = center
         # Use FOV to calculate proper distance
         fov_rad = np.radians(self.settings.camera_fov)
-        self.camera_distance = max_size / (2.0 * np.tan(fov_rad / 2.0)) * 1.2  # 1.2 = padding factor
+        self.camera_distance = max(max_size / (2.0 * np.tan(fov_rad / 2.0)) * 1.5, 1.0)  # 1.5 = padding factor, min 1m
         
         # Store as home position
         self.home_camera_distance = self.camera_distance
         self.home_camera_target = center.copy()
         
-        print(f"DEBUG: Framed camera. Target: {self.camera_target}, Distance: {self.camera_distance:.2f}, Size: {max_size:.2f}")
+        print(f"DEBUG: Framed camera. Target: {self.camera_target}, Distance: {self.camera_distance:.2f}, Size: {max_size:.2f}, UpAxis: {up_axis}, MetersPerUnit: {meters_per_unit}")
         self.update()
     
     def frame_selected(self):
@@ -1134,11 +1146,27 @@ class ViewportWidget(QOpenGLWidget):
             glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
             glColor3f(0.8, 0.8, 0.8)  # Default gray color
             
+            # Apply USD stage coordinate system conversion
+            glPushMatrix()
+            
+            # Get up_axis and meters_per_unit from geometry_data
+            up_axis = self.geometry_data.get('up_axis', 'Y')
+            meters_per_unit = self.geometry_data.get('meters_per_unit', 0.01)
+            
+            # Convert Z-up to Y-up (rotate -90 degrees around X axis)
+            if up_axis == 'Z':
+                glRotatef(-90.0, 1.0, 0.0, 0.0)
+            
+            # Apply meters_per_unit conversion (convert USD units to meters)
+            glScalef(meters_per_unit, meters_per_unit, meters_per_unit)
+            
             mesh_count = 0
             for mesh in self.geometry_data['meshes']:
                 if mesh and 'points' in mesh and len(mesh['points']) > 0:
                     self.draw_mesh(mesh)
                     mesh_count += 1
+            
+            glPopMatrix()
             
             # Only log mesh count occasionally
             import time
@@ -1172,8 +1200,10 @@ class ViewportWidget(QOpenGLWidget):
         # Apply transform
         glPushMatrix()
         if 'transform' in mesh and mesh['transform'] is not None:
-            transform = mesh['transform'].T  # OpenGL uses column-major
-            glMultMatrixf(transform.flatten())
+            # Convert to numpy array if it's a list
+            transform = np.array(mesh['transform'], dtype=np.float32)
+            # OpenGL uses column-major order, USD provides row-major
+            glMultMatrixf(transform.T.flatten())
         
         # Draw faces
         idx = 0
