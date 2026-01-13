@@ -766,29 +766,26 @@ class ViewportWidget(QOpenGLWidget):
             import traceback
             traceback.print_exc()
     
-    def frame_bounds(self, bounds: Dict):
-        """Frame camera to fit bounds"""
+    def frame_bounds(self, bounds: dict):
+        """Frame camera to bounds with proper distance calculation"""
         if not bounds:
             return
         
-        center = bounds.get('center', np.array([0.0, 0.0, 0.0]))
-        size_array = bounds.get('size', np.array([1.0, 1.0, 1.0]))
+        center = np.array(bounds['center'])
+        size = np.array(bounds['size'])
+        max_size = np.max(size)
         
-        # Ensure center and size are numpy arrays
-        if not isinstance(center, np.ndarray):
-            center = np.array(center)
-        if not isinstance(size_array, np.ndarray):
-            size_array = np.array(size_array)
-            
+        # Set camera to view entire bounds with better distance calculation
         self.camera_target = center
-        size = np.max(size_array)
-        # Calculate distance to fit the entire bounding box
-        # Use FOV to calculate appropriate distance
+        # Use FOV to calculate proper distance
         fov_rad = np.radians(self.settings.camera_fov)
-        distance = size / (2.0 * np.tan(fov_rad / 2.0)) * 1.5  # Add 50% padding
-        self.camera_distance = max(distance, 0.1)  # Ensure minimum distance
+        self.camera_distance = max_size / (2.0 * np.tan(fov_rad / 2.0)) * 1.2  # 1.2 = padding factor
         
-        print(f"DEBUG: Framed camera. Target: {self.camera_target}, Distance: {self.camera_distance}, Size: {size}")
+        # Store as home position
+        self.home_camera_distance = self.camera_distance
+        self.home_camera_target = center.copy()
+        
+        print(f"DEBUG: Framed camera. Target: {self.camera_target}, Distance: {self.camera_distance:.2f}, Size: {max_size:.2f}")
         self.update()
     
     def frame_selected(self):
@@ -826,18 +823,34 @@ class ViewportWidget(QOpenGLWidget):
             print("WARNING: Could not get OpenGL info")
         
         glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LESS)
         glEnable(GL_MULTISAMPLE)
         glEnable(GL_LINE_SMOOTH)
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        # Lighting
+        # Enable backface culling for performance
+        glEnable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
+        glFrontFace(GL_CCW)
+        
+        # Better lighting setup
         glEnable(GL_LIGHTING)
         glEnable(GL_LIGHT0)
+        glEnable(GL_LIGHT1)
+        
+        # Key light (main light from top-right)
         glLightfv(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
-        glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.0])
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])
+        glLightfv(GL_LIGHT0, GL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.8, 0.8, 0.8, 1.0])
+        glLightfv(GL_LIGHT0, GL_SPECULAR, [0.5, 0.5, 0.5, 1.0])
+        
+        # Fill light (softer from opposite side)
+        glLightfv(GL_LIGHT1, GL_POSITION, [-1.0, 0.5, -1.0, 0.0])
+        glLightfv(GL_LIGHT1, GL_AMBIENT, [0.1, 0.1, 0.1, 1.0])
+        glLightfv(GL_LIGHT1, GL_DIFFUSE, [0.4, 0.4, 0.4, 1.0])
+        glLightfv(GL_LIGHT1, GL_SPECULAR, [0.2, 0.2, 0.2, 1.0])
         
         print("DEBUG: OpenGL viewport initialized successfully")
         
@@ -1052,51 +1065,29 @@ class ViewportWidget(QOpenGLWidget):
         glEnable(GL_LIGHTING)
         
     def draw_axis(self):
-        """Draw 3D coordinate axis that rotates with the view (like Blender/Maya)"""
+        """Draw 3D coordinate axis at world origin (USD standard: Y-up, Z-forward, X-right)"""
         glDisable(GL_LIGHTING)
         glLineWidth(3.0)
         
-        # Position in bottom-left corner of viewport (in 3D space, not 2D overlay)
-        # Calculate screen-space position
-        axis_size = 1.0  # Size in world units
-        padding = 0.5  # Offset from corner
+        # Draw axis at world origin (0,0,0)
+        axis_size = 5.0  # Larger size for visibility
         
-        # Get current viewport dimensions for positioning
-        # We'll position it in world space at the bottom-left of the visible area
-        # Calculate a position that's always visible in the bottom-left
-        
-        # Get camera position and direction
-        cam_x = self.camera_distance * np.cos(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-        cam_y = self.camera_distance * np.sin(np.radians(self.camera_rotation_x))
-        cam_z = self.camera_distance * np.sin(np.radians(self.camera_rotation_y)) * np.cos(np.radians(self.camera_rotation_x))
-        camera_pos = self.camera_target + np.array([cam_x, cam_y, cam_z])
-        
-        # Calculate axis origin in world space (bottom-left of view)
-        # Use camera target as reference, offset to bottom-left
-        view_right = np.array([1, 0, 0])  # Will be transformed by view
-        view_up = np.array([0, 1, 0])
-        view_forward = np.array([0, 0, 1])
-        
-        # Position axis at camera target with offset
-        axis_origin = self.camera_target.copy()
-        
-        # Draw axis lines in 3D space (will rotate with view)
         glBegin(GL_LINES)
         
-        # X axis - Red (right)
-        glColor3f(1, 0, 0)
-        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2])
-        glVertex3f(axis_origin[0] + axis_size, axis_origin[1], axis_origin[2])
+        # X axis - Red (right) - positive X
+        glColor3f(1.0, 0.0, 0.0)
+        glVertex3f(0, 0, 0)
+        glVertex3f(axis_size, 0, 0)
         
-        # Y axis - Green (up)
-        glColor3f(0, 1, 0)
-        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2])
-        glVertex3f(axis_origin[0], axis_origin[1] + axis_size, axis_origin[2])
+        # Y axis - Green (up) - positive Y (USD standard up)
+        glColor3f(0.0, 1.0, 0.0)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, axis_size, 0)
         
-        # Z axis - Blue (forward)
-        glColor3f(0, 0, 1)
-        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2])
-        glVertex3f(axis_origin[0], axis_origin[1], axis_origin[2] + axis_size)
+        # Z axis - Blue (forward) - positive Z (USD standard forward)
+        glColor3f(0.0, 0.0, 1.0)
+        glVertex3f(0, 0, 0)
+        glVertex3f(0, 0, axis_size)
         
         glEnd()
         
