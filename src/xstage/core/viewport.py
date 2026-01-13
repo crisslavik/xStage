@@ -67,6 +67,10 @@ class ViewportWidget(QOpenGLWidget):
         self.axis_enabled = True
         self.axis_size = 1.0  # In meters
         
+        # USD stage settings
+        self.up_axis = 'Y'  # Default Y-up, will be updated from USD stage
+        self.meters_per_unit = 1.0  # Default 1 unit = 1 meter
+        
         # View settings
         self.background_color = (0.18, 0.18, 0.18, 1.0)  # Houdini-like bg
         self.camera_fov = 60.0
@@ -108,6 +112,10 @@ class ViewportWidget(QOpenGLWidget):
         if self.stage_manager:
             self.geometry_data = self.stage_manager.get_geometry_data(time_code)
             
+            # Get up-axis and meters_per_unit from geometry data
+            self.up_axis = self.geometry_data.get('up_axis', 'Y')
+            self.meters_per_unit = self.geometry_data.get('meters_per_unit', 0.01)
+            
             # Auto-frame on first load
             if 'bounds' in self.geometry_data and self.geometry_data['bounds']:
                 self.frame_bounds(self.geometry_data['bounds'])
@@ -119,12 +127,20 @@ class ViewportWidget(QOpenGLWidget):
         if not bounds:
             return
         
-        # Account for scene scale
-        center = bounds['center'] * self.scene_scale
-        size = np.max(bounds['size']) * self.scene_scale
+        # Get center and size, accounting for meters_per_unit
+        center = np.array(bounds['center'])
+        size = np.max(bounds['size'])
+        
+        # Convert to meters for consistent viewport units
+        center = center * self.meters_per_unit
+        size = size * self.meters_per_unit
+        
+        # If Z-up, swap Y and Z for camera target
+        if self.up_axis == 'Z':
+            center = np.array([center[0], center[2], center[1]])
         
         self.camera_target = center
-        self.camera_distance = size * 2.0
+        self.camera_distance = max(size * 2.0, 1.0)  # Minimum distance of 1m
         
         # Adjust grid spacing based on scene size
         self._auto_adjust_grid(size)
@@ -246,9 +262,19 @@ class ViewportWidget(QOpenGLWidget):
         if self.axis_enabled:
             self.draw_axis()
         
-        # Apply scene scale and draw geometry
+        # Apply Z-up to Y-up conversion if needed, then scene scale
         glPushMatrix()
+        
+        # Convert Z-up to Y-up (rotate -90 degrees around X axis)
+        if self.up_axis == 'Z':
+            glRotatef(-90.0, 1.0, 0.0, 0.0)
+        
+        # Apply meters_per_unit conversion (convert USD units to meters)
+        glScalef(self.meters_per_unit, self.meters_per_unit, self.meters_per_unit)
+        
+        # Apply user scene scale
         glScalef(self.scene_scale, self.scene_scale, self.scene_scale)
+        
         self.draw_geometry()
         glPopMatrix()
         
@@ -418,10 +444,11 @@ class ViewportWidget(QOpenGLWidget):
         fvi = mesh['face_vertex_indices']
         normals = mesh['normals']
         
-        # Apply transform (already scaled by scene_scale above)
+        # Apply transform (convert to numpy array if needed)
         glPushMatrix()
-        transform = mesh['transform'].T
-        glMultMatrixf(transform.flatten())
+        transform = np.array(mesh['transform'], dtype=np.float32)
+        # OpenGL expects column-major order, USD provides row-major
+        glMultMatrixf(transform.T.flatten())
         
         # Draw faces
         idx = 0

@@ -22,6 +22,8 @@ class USDStageManager:
         self.current_time: float = 0.0
         self.time_range: tuple = (0.0, 0.0)
         self.fps: float = 24.0
+        self.up_axis: str = 'Y'  # Default to Y-up
+        self.meters_per_unit: float = 0.01  # Default to cm (Maya/Max default)
         
     def load_stage(self, filepath: str) -> bool:
         """Load USD stage from file"""
@@ -44,9 +46,18 @@ class USDStageManager:
             # Get FPS
             self.fps = float(self.stage.GetTimeCodesPerSecond())
             
+            # Get up-axis from stage metadata
+            up_axis_token = UsdGeom.GetStageUpAxis(self.stage)
+            self.up_axis = 'Z' if up_axis_token == UsdGeom.Tokens.z else 'Y'
+            
+            # Get meters per unit
+            self.meters_per_unit = UsdGeom.GetStageMetersPerUnit(self.stage)
+            
             print(f"Loaded USD stage: {filepath}")
             print(f"Time range: {self.time_range[0]} - {self.time_range[1]}")
             print(f"FPS: {self.fps}")
+            print(f"Up axis: {self.up_axis}")
+            print(f"Meters per unit: {self.meters_per_unit}")
             
             return True
         except Exception as e:
@@ -107,6 +118,8 @@ class USDStageManager:
             'cameras': cameras,
             'lights': lights,
             'bounds': bounds,
+            'up_axis': self.up_axis,
+            'meters_per_unit': self.meters_per_unit,
             'variants': self._extract_variants(),
             'collections': self._extract_collections(),
             'materials': self._extract_materials()
