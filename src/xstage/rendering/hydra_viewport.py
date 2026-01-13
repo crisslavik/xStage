@@ -181,8 +181,8 @@ class HydraViewportWidget(QOpenGLWidget):
         if not USD_AVAILABLE or not self.engine:
             return
         
-        # Set viewport
-        self.engine.SetRenderViewport(Gf.Rect2i(Gf.Vec2i(0, 0), w, h))
+        # Set viewport - USD 25.11+ uses GfVec4d(x, y, width, height)
+        self.engine.SetRenderViewport(Gf.Vec4d(0, 0, w, h))
     
     def paintGL(self):
         """Render using Hydra 2.0"""
