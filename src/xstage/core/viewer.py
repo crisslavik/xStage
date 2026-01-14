@@ -1701,30 +1701,32 @@ class USDViewerWindow(QMainWindow):
         viewport_layout.addWidget(self.viewport_header)
         
         # Create central widget with viewport
-        # Try to use Hydra viewport if available, fallback to OpenGL
+        # Try to use Hydra viewport (Storm) as PRIMARY - it's what USDView uses
         self.hydra_viewport = None
-        self.viewport = ViewportWidget()
-        self.viewport.set_stage_manager(self.stage_manager)
+        self.viewport = None  # OpenGL fallback, only created if needed
         
         try:
             from ..rendering.hydra_viewport import HydraViewportWidget
             # Check if CameraUtil.Frustum is available (indicates full imaging support)
             from pxr import CameraUtil
             if not hasattr(CameraUtil, 'Frustum'):
-                raise ImportError("CameraUtil.Frustum not available - pip USD lacks full imaging support")
+                raise ImportError("CameraUtil.Frustum not available - need USD built from source")
             
-            if HydraViewportWidget:
-                self.hydra_viewport = HydraViewportWidget(self)
-                self.hydra_viewport.set_stage_manager(self.stage_manager)
-                # Add Hydra viewport to container
-                viewport_layout.addWidget(self.hydra_viewport)
-                # Don't enable by default - user can toggle it via menu
-                self.statusBar().showMessage("Hydra 2.0 available (toggle in View menu)", 3000)
+            # Use Hydra/Storm as PRIMARY renderer (like USDView)
+            self.hydra_viewport = HydraViewportWidget(self)
+            self.hydra_viewport.set_stage_manager(self.stage_manager)
+            viewport_layout.addWidget(self.hydra_viewport)
+            self.use_hydra = True
+            print("✅ Using Hydra 2.0 / Storm renderer (like USDView)")
+            self.statusBar().showMessage("Hydra 2.0 / Storm renderer active", 3000)
+            
         except (ImportError, Exception) as e:
-            # Hydra viewport not available - use OpenGL fallback
+            # Hydra not available - fall back to basic OpenGL
             print(f"ℹ️  Hydra 2.0 not available: {e}")
-            print("   Using OpenGL fallback rendering (fully functional)")
+            print("   Falling back to basic OpenGL rendering")
             self.hydra_viewport = None
+            self.viewport = ViewportWidget()
+            self.viewport.set_stage_manager(self.stage_manager)
             viewport_layout.addWidget(self.viewport)
             self.use_hydra = False
         
