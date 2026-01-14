@@ -869,6 +869,9 @@ class ViewportWidget(QOpenGLWidget):
     def resizeGL(self, w, h):
         """Handle viewport resize"""
         glViewport(0, 0, w, h)
+        # Update overlay size when viewport resizes
+        if hasattr(self, 'overlay') and self.overlay:
+            self.overlay.setGeometry(0, 0, w, h)
         
     def paintGL(self):
         """Render the scene"""
@@ -1734,11 +1737,21 @@ class USDViewerWindow(QMainWindow):
         active_viewport = self.hydra_viewport if (hasattr(self, 'hydra_viewport') and self.hydra_viewport) else self.viewport
         self.viewport_overlay = ViewportOverlay(active_viewport)
         self.viewport_overlay.setParent(active_viewport)
+        # Set geometry to match viewport size
+        self.viewport_overlay.setGeometry(active_viewport.rect())
         self.viewport_overlay.raise_()
         self.viewport_overlay.show()
         
         # Store overlay reference in viewport for resize handling
         active_viewport.overlay = self.viewport_overlay
+        
+        # Connect resize event to update overlay size
+        def update_overlay_size():
+            if hasattr(active_viewport, 'overlay') and active_viewport.overlay:
+                active_viewport.overlay.setGeometry(active_viewport.rect())
+        
+        # Use a timer to update overlay after viewport is fully initialized
+        QTimer.singleShot(100, update_overlay_size)
         
         # Create menus
         self.create_menus()
