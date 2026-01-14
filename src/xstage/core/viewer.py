@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QMenuBar, QMenu, QToolBar, QStatusBar, QFileDialog, QSlider,
     QPushButton, QLabel, QDockWidget, QTreeWidget, QTreeWidgetItem,
     QMessageBox, QProgressDialog, QComboBox, QSpinBox, QGroupBox,
-    QFormLayout, QSplitter, QInputDialog, QTabWidget
+    QFormLayout, QSplitter, QInputDialog, QTabWidget, QLineEdit
 )
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QThread, QUrl
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QPalette, QColor, QSurfaceFormat, QDragEnterEvent, QDropEvent
@@ -2076,13 +2076,88 @@ class USDViewerWindow(QMainWindow):
         toolbar.addWidget(frame_btn)
         
     def create_hierarchy_dock(self):
-        """Create scene hierarchy dock"""
+        """Create scene hierarchy dock with USDView-like features"""
         dock = QDockWidget("Scene Hierarchy", self)
+        
+        # Main container with tabs (like USDView)
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Tab widget for Stage/Layers views
+        self.hierarchy_tabs = QTabWidget()
+        
+        # === Stage Tree Tab (Prim Hierarchy) ===
+        stage_widget = QWidget()
+        stage_layout = QVBoxLayout(stage_widget)
+        stage_layout.setContentsMargins(2, 2, 2, 2)
+        
+        # Search/filter bar
+        search_layout = QHBoxLayout()
+        self.prim_search = QLineEdit()
+        self.prim_search.setPlaceholderText("Filter prims...")
+        self.prim_search.textChanged.connect(self.filter_hierarchy)
+        search_layout.addWidget(self.prim_search)
+        stage_layout.addLayout(search_layout)
+        
+        # Hierarchy tree
         self.hierarchy_tree = QTreeWidget()
-        self.hierarchy_tree.setHeaderLabel("Prims")
+        self.hierarchy_tree.setHeaderLabels(["Name", "Type", "Vis"])
+        self.hierarchy_tree.setColumnWidth(0, 200)
+        self.hierarchy_tree.setColumnWidth(1, 80)
+        self.hierarchy_tree.setColumnWidth(2, 30)
         self.hierarchy_tree.itemDoubleClicked.connect(self.on_hierarchy_item_double_clicked)
         self.hierarchy_tree.itemChanged.connect(self.on_hierarchy_item_changed)
-        dock.setWidget(self.hierarchy_tree)
+        self.hierarchy_tree.itemSelectionChanged.connect(self.on_hierarchy_selection_changed)
+        self.hierarchy_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.hierarchy_tree.customContextMenuRequested.connect(self.show_prim_context_menu)
+        stage_layout.addWidget(self.hierarchy_tree)
+        
+        self.hierarchy_tabs.addTab(stage_widget, "Stage")
+        
+        # === Layer Stack Tab (like USDView) ===
+        layers_widget = QWidget()
+        layers_layout = QVBoxLayout(layers_widget)
+        layers_layout.setContentsMargins(2, 2, 2, 2)
+        
+        self.layer_tree = QTreeWidget()
+        self.layer_tree.setHeaderLabels(["Layer", "Type"])
+        self.layer_tree.setColumnWidth(0, 250)
+        layers_layout.addWidget(self.layer_tree)
+        
+        self.hierarchy_tabs.addTab(layers_widget, "Layers")
+        
+        # === Composition Tab ===
+        comp_widget = QWidget()
+        comp_layout = QVBoxLayout(comp_widget)
+        comp_layout.setContentsMargins(2, 2, 2, 2)
+        
+        self.composition_tree = QTreeWidget()
+        self.composition_tree.setHeaderLabels(["Arc", "Target"])
+        comp_layout.addWidget(self.composition_tree)
+        
+        self.hierarchy_tabs.addTab(comp_widget, "Composition")
+        
+        layout.addWidget(self.hierarchy_tabs)
+        
+        # === Properties Panel (collapsible) ===
+        self.properties_group = QGroupBox("Properties")
+        self.properties_group.setCheckable(True)
+        self.properties_group.setChecked(True)
+        props_layout = QVBoxLayout()
+        
+        self.properties_tree = QTreeWidget()
+        self.properties_tree.setHeaderLabels(["Property", "Value", "Type"])
+        self.properties_tree.setColumnWidth(0, 120)
+        self.properties_tree.setColumnWidth(1, 100)
+        self.properties_tree.setMaximumHeight(200)
+        props_layout.addWidget(self.properties_tree)
+        
+        self.properties_group.setLayout(props_layout)
+        layout.addWidget(self.properties_group)
+        
+        dock.setWidget(container)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         
     def create_info_dock(self):
@@ -2518,6 +2593,10 @@ class USDViewerWindow(QMainWindow):
         """Update scene hierarchy tree with enhanced features"""
         self.hierarchy_tree.clear()
         
+        # Also update layer stack and composition tabs
+        self.update_layer_stack()
+        self.update_composition_arcs()
+        
         if not self.stage_manager.stage:
             return
         
@@ -2619,6 +2698,329 @@ class USDViewerWindow(QMainWindow):
             add_prim_to_tree(child)
             
         self.hierarchy_tree.expandAll()
+    
+    def update_layer_stack(self):
+        """Update layer stack tree (like USDView)"""
+        if not hasattr(self, 'layer_tree'):
+            return
+        self.layer_tree.clear()
+        
+        if not self.stage_manager.stage:
+            return
+        
+        try:
+            stage = self.stage_manager.stage
+            
+            # Root layer
+            root_layer = stage.GetRootLayer()
+            root_item = QTreeWidgetItem([root_layer.identifier, "Root"])
+            root_item.setToolTip(0, root_layer.realPath if root_layer.realPath else root_layer.identifier)
+            self.layer_tree.addTopLevelItem(root_item)
+            
+            # Session layer
+            session_layer = stage.GetSessionLayer()
+            if session_layer:
+                session_item = QTreeWidgetItem([session_layer.identifier or "(session)", "Session"])
+                self.layer_tree.addTopLevelItem(session_item)
+            
+            # Sublayers
+            def add_sublayers(layer, parent_item):
+                for sublayer_path in layer.subLayerPaths:
+                    sublayer = Sdf.Layer.FindOrOpen(sublayer_path)
+                    if sublayer:
+                        sublayer_item = QTreeWidgetItem([sublayer.identifier, "Sublayer"])
+                        sublayer_item.setToolTip(0, sublayer.realPath if sublayer.realPath else sublayer.identifier)
+                        parent_item.addChild(sublayer_item)
+                        add_sublayers(sublayer, sublayer_item)
+                    else:
+                        sublayer_item = QTreeWidgetItem([sublayer_path, "Missing"])
+                        sublayer_item.setForeground(0, QColor(255, 100, 100))
+                        parent_item.addChild(sublayer_item)
+            
+            add_sublayers(root_layer, root_item)
+            self.layer_tree.expandAll()
+            
+        except Exception as e:
+            print(f"Error updating layer stack: {e}")
+    
+    def update_composition_arcs(self):
+        """Update composition arcs for selected prim"""
+        if not hasattr(self, 'composition_tree'):
+            return
+        self.composition_tree.clear()
+        
+        if not self.stage_manager.stage:
+            return
+        
+        # Get selected prim
+        selected_items = self.hierarchy_tree.selectedItems()
+        if not selected_items:
+            return
+        
+        prim_path = selected_items[0].data(0, Qt.ItemDataRole.UserRole)
+        if not prim_path or "::" in prim_path:  # Skip variant/collection items
+            return
+        
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if not prim:
+                return
+            
+            # References
+            refs = prim.GetReferences()
+            if refs:
+                refs_item = QTreeWidgetItem(["References", ""])
+                self.composition_tree.addTopLevelItem(refs_item)
+                # Note: GetAddedItems() returns the authored references
+                try:
+                    prim_refs = refs.GetAddedItems()
+                    for ref in prim_refs:
+                        ref_item = QTreeWidgetItem(["", str(ref.assetPath)])
+                        refs_item.addChild(ref_item)
+                except:
+                    pass
+            
+            # Payloads
+            if prim.HasPayload():
+                payload_item = QTreeWidgetItem(["Payload", "Has payload"])
+                self.composition_tree.addTopLevelItem(payload_item)
+            
+            # Inherits
+            inherits = prim.GetInherits()
+            if inherits:
+                try:
+                    inherit_paths = inherits.GetAllDirectInherits()
+                    if inherit_paths:
+                        inherits_item = QTreeWidgetItem(["Inherits", ""])
+                        self.composition_tree.addTopLevelItem(inherits_item)
+                        for path in inherit_paths:
+                            inh_item = QTreeWidgetItem(["", str(path)])
+                            inherits_item.addChild(inh_item)
+                except:
+                    pass
+            
+            # Specializes
+            specializes = prim.GetSpecializes()
+            if specializes:
+                try:
+                    spec_paths = specializes.GetAllDirectSpecializes()
+                    if spec_paths:
+                        spec_item = QTreeWidgetItem(["Specializes", ""])
+                        self.composition_tree.addTopLevelItem(spec_item)
+                        for path in spec_paths:
+                            s_item = QTreeWidgetItem(["", str(path)])
+                            spec_item.addChild(s_item)
+                except:
+                    pass
+            
+            # Variant sets
+            variant_sets = prim.GetVariantSets()
+            if variant_sets:
+                vs_names = variant_sets.GetNames()
+                if vs_names:
+                    vs_item = QTreeWidgetItem(["Variant Sets", ""])
+                    self.composition_tree.addTopLevelItem(vs_item)
+                    for vs_name in vs_names:
+                        vs = variant_sets.GetVariantSet(vs_name)
+                        current = vs.GetVariantSelection()
+                        choices = vs.GetVariantNames()
+                        v_item = QTreeWidgetItem([vs_name, f"{current} ({len(choices)} choices)"])
+                        vs_item.addChild(v_item)
+            
+            self.composition_tree.expandAll()
+            
+        except Exception as e:
+            print(f"Error updating composition arcs: {e}")
+    
+    def filter_hierarchy(self, text: str):
+        """Filter hierarchy tree by search text"""
+        def set_item_visible(item, visible):
+            item.setHidden(not visible)
+            
+        def filter_item(item, search_text):
+            """Returns True if item or any child matches"""
+            item_text = item.text(0).lower()
+            matches = search_text.lower() in item_text
+            
+            # Check children
+            child_matches = False
+            for i in range(item.childCount()):
+                if filter_item(item.child(i), search_text):
+                    child_matches = True
+            
+            # Show if matches or has matching children
+            visible = matches or child_matches
+            set_item_visible(item, visible)
+            
+            # Expand if has matching children
+            if child_matches:
+                item.setExpanded(True)
+            
+            return visible
+        
+        if not text:
+            # Show all items
+            for i in range(self.hierarchy_tree.topLevelItemCount()):
+                item = self.hierarchy_tree.topLevelItem(i)
+                self._show_all_items(item)
+            return
+        
+        for i in range(self.hierarchy_tree.topLevelItemCount()):
+            item = self.hierarchy_tree.topLevelItem(i)
+            filter_item(item, text)
+    
+    def _show_all_items(self, item):
+        """Recursively show all items"""
+        item.setHidden(False)
+        for i in range(item.childCount()):
+            self._show_all_items(item.child(i))
+    
+    def on_hierarchy_selection_changed(self):
+        """Handle hierarchy selection change - update properties and composition"""
+        self.update_composition_arcs()
+        self.update_properties_panel()
+    
+    def update_properties_panel(self):
+        """Update properties panel for selected prim"""
+        if not hasattr(self, 'properties_tree'):
+            return
+        self.properties_tree.clear()
+        
+        if not self.stage_manager.stage:
+            return
+        
+        selected_items = self.hierarchy_tree.selectedItems()
+        if not selected_items:
+            return
+        
+        prim_path = selected_items[0].data(0, Qt.ItemDataRole.UserRole)
+        if not prim_path or "::" in prim_path:
+            return
+        
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if not prim:
+                return
+            
+            # Add attributes
+            for attr in prim.GetAttributes():
+                value = attr.Get()
+                type_name = str(attr.GetTypeName())
+                value_str = str(value) if value is not None else "(none)"
+                if len(value_str) > 50:
+                    value_str = value_str[:47] + "..."
+                
+                item = QTreeWidgetItem([attr.GetName(), value_str, type_name])
+                self.properties_tree.addTopLevelItem(item)
+            
+        except Exception as e:
+            print(f"Error updating properties: {e}")
+    
+    def show_prim_context_menu(self, position):
+        """Show context menu for prim"""
+        item = self.hierarchy_tree.itemAt(position)
+        if not item:
+            return
+        
+        prim_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not prim_path or "::" in prim_path:
+            return
+        
+        menu = QMenu(self)
+        
+        # Frame selected
+        frame_action = menu.addAction("Frame Selected")
+        frame_action.triggered.connect(lambda: self.frame_prim(prim_path))
+        
+        menu.addSeparator()
+        
+        # Visibility
+        show_action = menu.addAction("Show")
+        show_action.triggered.connect(lambda: self.set_prim_visibility(prim_path, True))
+        hide_action = menu.addAction("Hide")
+        hide_action.triggered.connect(lambda: self.set_prim_visibility(prim_path, False))
+        
+        menu.addSeparator()
+        
+        # Load/Unload payload
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if prim and prim.HasPayload():
+                if prim.IsLoaded():
+                    unload_action = menu.addAction("Unload Payload")
+                    unload_action.triggered.connect(lambda: self.unload_payload(prim_path))
+                else:
+                    load_action = menu.addAction("Load Payload")
+                    load_action.triggered.connect(lambda: self.load_payload(prim_path))
+        except:
+            pass
+        
+        menu.addSeparator()
+        
+        # Copy path
+        copy_action = menu.addAction("Copy Path")
+        copy_action.triggered.connect(lambda: QApplication.clipboard().setText(prim_path))
+        
+        menu.exec(self.hierarchy_tree.viewport().mapToGlobal(position))
+    
+    def frame_prim(self, prim_path: str):
+        """Frame camera on specific prim"""
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if prim:
+                imageable = UsdGeom.Imageable(prim)
+                if imageable:
+                    bbox = imageable.ComputeWorldBound(self.stage_manager.current_time, UsdGeom.Tokens.default_)
+                    if not bbox.GetBox().IsEmpty():
+                        box = bbox.GetBox()
+                        center = (box.GetMin() + box.GetMax()) / 2
+                        size = box.GetMax() - box.GetMin()
+                        bounds = {
+                            'center': [center[0], center[1], center[2]],
+                            'size': [size[0], size[1], size[2]]
+                        }
+                        active_viewport = self.hydra_viewport if self.hydra_viewport else self.viewport
+                        if active_viewport:
+                            active_viewport.frame_bounds(bounds)
+        except Exception as e:
+            print(f"Error framing prim: {e}")
+    
+    def set_prim_visibility(self, prim_path: str, visible: bool):
+        """Set prim visibility"""
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if prim:
+                imageable = UsdGeom.Imageable(prim)
+                if imageable:
+                    if visible:
+                        imageable.MakeVisible()
+                    else:
+                        imageable.MakeInvisible()
+                    self.update_viewport()
+        except Exception as e:
+            print(f"Error setting visibility: {e}")
+    
+    def load_payload(self, prim_path: str):
+        """Load payload for prim"""
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if prim:
+                prim.Load()
+                self.update_hierarchy()
+                self.update_viewport()
+        except Exception as e:
+            print(f"Error loading payload: {e}")
+    
+    def unload_payload(self, prim_path: str):
+        """Unload payload for prim"""
+        try:
+            prim = self.stage_manager.stage.GetPrimAtPath(prim_path)
+            if prim:
+                prim.Unload()
+                self.update_hierarchy()
+                self.update_viewport()
+        except Exception as e:
+            print(f"Error unloading payload: {e}")
         
     def import_convert_file(self):
         """Import and convert 3D file to USD"""
