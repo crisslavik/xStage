@@ -25,12 +25,12 @@ def test_material_manager():
     
     try:
         stage = Usd.Stage.CreateNew(stage_path)
-        manager = MaterialManager(stage)
-        
-        # Extract materials (may be empty)
-        materials = manager.extract_materials()
+        manager = MaterialManager()
+
+        # Find materials on the stage (may be empty)
+        materials = manager.find_all_materials(stage)
         assert isinstance(materials, list)
-        
+
     finally:
         Path(stage_path).unlink()
 
@@ -48,8 +48,8 @@ def test_camera_manager():
     try:
         stage = Usd.Stage.CreateNew(stage_path)
         manager = CameraManager(stage)
-        
-        cameras = manager.get_cameras()
+
+        cameras = manager.find_all_cameras()
         assert isinstance(cameras, list)
         
     finally:
@@ -68,9 +68,9 @@ def test_collection_manager():
     
     try:
         stage = Usd.Stage.CreateNew(stage_path)
-        manager = CollectionManager(stage)
-        
-        collections = manager.get_collections()
+        manager = CollectionManager()
+
+        collections = manager.get_collections(stage.GetPseudoRoot())
         assert isinstance(collections, list)
         
     finally:
@@ -89,9 +89,9 @@ def test_variant_manager():
     
     try:
         stage = Usd.Stage.CreateNew(stage_path)
-        manager = VariantManager(stage)
-        
-        variants = manager.get_variant_sets()
+        manager = VariantManager()
+
+        variants = manager.get_variant_sets(stage.GetPseudoRoot())
         assert isinstance(variants, dict)
         
     finally:

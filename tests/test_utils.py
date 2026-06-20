@@ -23,7 +23,8 @@ def test_theme_manager():
     # Test theme modes
     assert ThemeMode.DARK is not None
     assert ThemeMode.LIGHT is not None
-    assert ThemeMode.HIGH_CONTRAST is not None
+    assert ThemeMode.AUTO is not None
+    assert ThemeMode.CUSTOM is not None
 
 
 def test_recent_files_manager():
@@ -35,7 +36,7 @@ def test_recent_files_manager():
         manager = RecentFilesManager(config_path=config_path)
         
         # Add a file
-        manager.add_file("/test/path/file.usd", "usd", "Test Stage")
+        manager.add_file("/test/path/file.usd", "usd")
         
         # Get recent files
         recent = manager.get_recent_files()
@@ -60,7 +61,9 @@ def test_bookmark_manager():
         from xstage.utils.bookmarks import Bookmark
         
         bookmark = Bookmark(
+            id="bookmark-1",
             name="Test Bookmark",
+            type="prim",
             stage_path="/test/stage.usd",
             prim_path="/World/Mesh"
         )
@@ -80,9 +83,11 @@ def test_annotation_manager():
     manager = AnnotationManager()
     
     annotation = Annotation(
+        id="annotation-1",
         type="text",
         text="Test annotation",
-        position={"x": 100, "y": 200}
+        viewport_position=(100.0, 200.0),
+        points=[],
     )
     
     manager.add_annotation(annotation)
@@ -105,7 +110,7 @@ def test_cache_manager():
         
         # Test cache stats
         stats = manager.get_cache_stats()
-        assert 'total_files' in stats
+        assert 'geometry_entries' in stats
         assert 'total_disk_size_mb' in stats
 
 
@@ -159,9 +164,11 @@ def test_validation_manager():
     try:
         stage = Usd.Stage.CreateNew(stage_path)
         stage.GetRootLayer().Save()
-        
-        results = manager.validate_stage(stage_path)
-        assert isinstance(results, list)
+
+        # validate_stage takes a live Stage and returns a results dict
+        results = manager.validate_stage(stage)
+        assert isinstance(results, dict)
+        assert 'passed' in results
     finally:
         Path(stage_path).unlink()
 
