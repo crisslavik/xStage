@@ -125,7 +125,7 @@ class OpenGLViewport(QOpenGLWidget):
             gl_renderer = glGetString(GL_RENDERER)
             print(f"DEBUG: OpenGL Version: {gl_version}")
             print(f"DEBUG: OpenGL Renderer: {gl_renderer}")
-        except:
+        except Exception:
             print("WARNING: Could not get OpenGL info")
         
         glEnable(GL_DEPTH_TEST)

@@ -106,7 +106,7 @@ class SceneComparator:
                     if prim_path not in diff.different_values:
                         diff.different_values[prim_path] = {}
                     diff.different_values[prim_path][attr_name] = (value1, value2)
-            except:
+            except Exception:
                 pass
         
         # Check if prim type changed

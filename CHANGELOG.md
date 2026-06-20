@@ -3,13 +3,37 @@
 ## [Unreleased]
 
 ### Added
+- **Logging infrastructure** (`src/xstage/logging_config.py`): centralized
+  `get_logger()` / idempotent `configure_logging()` with env-driven level
+  (`$XSTAGE_LOG_LEVEL`), optional file output, and root-logger-safe behavior so
+  xStage is a good citizen when imported into host DCCs.
+- **Command-line interface**: `xstage` now accepts a USD file argument plus
+  `--version`, `--log-level`, `--log-file`, and `--platform`.
+- **Engineering audit** (`AUDIT.md`): prioritized findings and roadmap.
+- **Tests**: `tests/conftest.py` (session `QApplication` fixture) and
+  `tests/test_infrastructure.py` (logging + CLI). Suite now 33 passed / 4
+  skipped, up from a fully-broken state.
 - **USD Version Detection**: Runtime USD version detection and feature flags
   - New module: `src/xstage/utils/usd_version.py`
   - Feature flags for version-specific features (light_linking, dof, etc.)
   - Helper functions: `USD_VERSION_AT_LEAST()`, `check_feature()`
   - Integrated into core modules for better maintainability
 
+### Fixed
+- Test suite was completely unrunnable (`tests/__init__.py` contained a shell
+  command; widget tests aborted the process with no `QApplication`).
+- `converters/adobe_converter.py` used a broken absolute import that silently
+  removed `AdobeUSDConverter` from the public API.
+- CI did not install `libEGL.so.1`, so PySide6 failed to import on the runner.
+- `main()` force-overrode `QT_QPA_PLATFORM=xcb` (breaking Wayland/headless); it
+  now respects the environment and `--platform`.
+
 ### Changed
+- All 53 bare `except:` clauses converted to `except Exception:` so they no
+  longer swallow `KeyboardInterrupt`/`SystemExit`.
+- pytest configuration consolidated into `pytest.ini` (removed the duplicate
+  `[tool.pytest.ini_options]` block that pytest was ignoring).
+- Added `[project.optional-dependencies].dev` for `pip install -e .[dev]`.
 - **Documentation Cleanup**: Removed 4 outdated/redundant documentation files
   - Removed `docs/xmaterial-support.md` (redundant with materialx-support.md)
   - Removed `DOCUMENTATION_CONSOLIDATION.md` (outdated)

@@ -36,7 +36,7 @@ class QuiltiXManager:
                     timeout=2
                 )
                 return result.returncode == 0
-            except:
+            except Exception:
                 return False
     
     def is_available(self) -> bool:

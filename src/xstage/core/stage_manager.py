@@ -197,7 +197,7 @@ class USDStageManager:
             return False
         try:
             return prim.IsA(UsdLux.Light) or prim.IsA(UsdLux.LightAPI)
-        except:
+        except Exception:
             return False
     
     def _extract_light(self, prim: Usd.Prim, time_code: float) -> Optional[Dict]:

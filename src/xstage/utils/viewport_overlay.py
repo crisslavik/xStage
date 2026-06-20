@@ -74,7 +74,7 @@ class ViewportOverlay(QWidget):
             try:
                 process = psutil.Process()
                 self.memory_usage = process.memory_info().rss / (1024 * 1024)  # MB
-            except:
+            except Exception:
                 self.memory_usage = 0.0
         self.update()
     

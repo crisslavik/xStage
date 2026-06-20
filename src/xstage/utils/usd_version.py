@@ -28,7 +28,7 @@ try:
                     version_info = Usd.GetVersion()
                     if version_info:
                         USD_VERSION_TUPLE = (version_info[0], version_info[1], version_info[2] if len(version_info) > 2 else 0)
-                except:
+                except Exception:
                     pass
             
             # If still unknown, check for known features
@@ -40,7 +40,7 @@ try:
                         USD_VERSION_TUPLE = (25, 11, 0)  # Assume at least 25.11
                     else:
                         USD_VERSION_TUPLE = (23, 11, 0)  # Assume older version
-                except:
+                except Exception:
                     USD_VERSION_TUPLE = (23, 11, 0)  # Conservative default
     
     except Exception as e:

@@ -115,7 +115,7 @@ class OpenExecManager:
             if attr:
                 try:
                     return attr.Get(time_code)
-                except:
+                except Exception:
                     # If Get fails, it might be computed
                     # Try to evaluate it
                     pass
@@ -147,7 +147,7 @@ class OpenExecManager:
                     # Get computed attribute names from OpenExec
                     # This depends on the OpenExec API
                     pass
-            except:
+            except Exception:
                 pass
         
         return computed
@@ -225,7 +225,7 @@ class OpenExecManager:
                 # Try to get computed value
                 if info['can_compute']:
                     info['computed_value'] = self.get_computed_value(prim, attr_name)
-        except:
+        except Exception:
             pass
         
         return info

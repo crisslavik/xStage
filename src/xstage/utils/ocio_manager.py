@@ -22,7 +22,7 @@ try:
             OCIO_VERSION_STRING = getattr(ocio, '__version__', '2.2.0')
             version_parts = OCIO_VERSION_STRING.split('.')
             OCIO_VERSION_TUPLE = tuple(int(part) for part in version_parts[:3])
-    except:
+    except Exception:
         # Default to 2.2.0 if version detection fails
         OCIO_VERSION_STRING = "2.2.0"
         OCIO_VERSION_TUPLE = (2, 2, 0)
@@ -107,7 +107,7 @@ class OCIOManager:
                 self.config = ocio.Config.CreateFromConfig("aces_1.2")
                 self.config_path = "aces_1.2"
                 return True
-            except:
+            except Exception:
                 pass
             
             # Try ACES 1.3 (if available)
@@ -115,7 +115,7 @@ class OCIOManager:
                 self.config = ocio.Config.CreateFromConfig("aces_1.3")
                 self.config_path = "aces_1.3"
                 return True
-            except:
+            except Exception:
                 pass
             
             # Last resort: create minimal config
@@ -257,7 +257,7 @@ class OCIOManager:
         
         try:
             return self.config.getName() or self.config_path or "Unknown"
-        except:
+        except Exception:
             return self.config_path or "Unknown"
     
     def is_available(self) -> bool:

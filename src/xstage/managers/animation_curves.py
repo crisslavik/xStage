@@ -125,7 +125,7 @@ class AnimationCurveManager:
                         all_values.extend(v['value'])
                 if all_values:
                     curve_data['value_range'] = (min(all_values), max(all_values))
-            except:
+            except Exception:
                 pass
         
         return curve_data

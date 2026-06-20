@@ -67,7 +67,7 @@ class AdobeUSDConverter(BaseConverter):
                 from ..utils.adobe_plugin_installer import AdobePluginInstaller
                 installer = AdobePluginInstaller()
                 installer.setup_plugin_path()
-            except:
+            except Exception:
                 pass
             
             # Check if FBX plugin is registered
@@ -80,7 +80,7 @@ class AdobeUSDConverter(BaseConverter):
                 if not fbx_plugin.isLoaded:
                     try:
                         fbx_plugin.Load()
-                    except:
+                    except Exception:
                         pass
                 if fbx_plugin.isLoaded:
                     return True
@@ -99,7 +99,7 @@ class AdobeUSDConverter(BaseConverter):
                 installer = AdobePluginInstaller()
                 xstage_plugin_path = installer.get_xstage_plugin_path()
                 plugin_paths.insert(0, str(xstage_plugin_path))
-            except:
+            except Exception:
                 pass
             
             for path in plugin_paths:

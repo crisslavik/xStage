@@ -461,7 +461,7 @@ class USDStageManager:
                         pattern_attr = prim.GetAttribute(f"collection:{collection.GetName()}:includeRoot")
                         if pattern_attr:
                             collection_data['pattern_expression'] = pattern_attr.Get(time_code)
-                    except:
+                    except Exception:
                         pass
                 
                 collections.append(collection_data)
@@ -672,7 +672,7 @@ class USDStageManager:
                 default_color_space = ColorSpaceManager.get_default_color_space(self.stage)
                 if default_color_space:
                     info['default_color_space'] = default_color_space
-            except:
+            except Exception:
                 pass
         
         return info
@@ -831,7 +831,7 @@ class ViewportWidget(QOpenGLWidget):
             gl_renderer = glGetString(GL_RENDERER)
             print(f"DEBUG: OpenGL Version: {gl_version}")
             print(f"DEBUG: OpenGL Renderer: {gl_renderer}")
-        except:
+        except Exception:
             print("WARNING: Could not get OpenGL info")
         
         glEnable(GL_DEPTH_TEST)
@@ -2777,7 +2777,7 @@ class USDViewerWindow(QMainWindow):
                     for ref in prim_refs:
                         ref_item = QTreeWidgetItem(["", str(ref.assetPath)])
                         refs_item.addChild(ref_item)
-                except:
+                except Exception:
                     pass
             
             # Payloads
@@ -2796,7 +2796,7 @@ class USDViewerWindow(QMainWindow):
                         for path in inherit_paths:
                             inh_item = QTreeWidgetItem(["", str(path)])
                             inherits_item.addChild(inh_item)
-                except:
+                except Exception:
                     pass
             
             # Specializes
@@ -2810,7 +2810,7 @@ class USDViewerWindow(QMainWindow):
                         for path in spec_paths:
                             s_item = QTreeWidgetItem(["", str(path)])
                             spec_item.addChild(s_item)
-                except:
+                except Exception:
                     pass
             
             # Variant sets
@@ -2952,7 +2952,7 @@ class USDViewerWindow(QMainWindow):
                 else:
                     load_action = menu.addAction("Load Payload")
                     load_action.triggered.connect(lambda: self.load_payload(prim_path))
-        except:
+        except Exception:
             pass
         
         menu.addSeparator()
@@ -4191,24 +4191,76 @@ class USDViewerWindow(QMainWindow):
             QMessageBox.warning(self, "Variant Selection Error", f"Error selecting variant:\n{e}")
 
 
-def main():
-    """Application entry point"""
-    # CRITICAL: Set platform BEFORE importing QApplication
-    # Force xcb (X11) platform plugin - EGL is failing on this system
-    # Must be set before any Qt imports or QApplication creation
+def _parse_args(argv=None):
+    """Parse command-line arguments for the xStage entry point."""
+    import argparse
+
+    try:
+        from .. import __version__ as _version
+    except Exception:
+        _version = "0.1.0"
+
+    parser = argparse.ArgumentParser(
+        prog="xstage",
+        description="xStage - Professional USD viewer with pipeline integration",
+    )
+    parser.add_argument(
+        "usd_file",
+        nargs="?",
+        help="USD/USDA/USDC/USDZ file to open on startup",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"xStage {_version}",
+    )
+    parser.add_argument(
+        "--log-level",
+        default=None,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging verbosity (default: INFO, or $XSTAGE_LOG_LEVEL).",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Also write logs to this file.",
+    )
+    parser.add_argument(
+        "--platform",
+        default=None,
+        help="Override the Qt platform plugin (e.g. xcb, wayland, offscreen). "
+        "By default xStage respects $QT_QPA_PLATFORM and lets Qt auto-detect.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    """Application entry point."""
     import os
-    os.environ['QT_QPA_PLATFORM'] = 'xcb'
-    os.environ['QT_OPENGL'] = 'desktop'
-    
-    # Disable EGL explicitly
-    os.environ['QT_XCB_GL_INTEGRATION'] = 'xcb_glx'
-    
-    # Debug: Print what we're setting
-    print(f"Setting QT_QPA_PLATFORM={os.environ.get('QT_QPA_PLATFORM')}", file=sys.stderr)
-    print(f"Setting QT_OPENGL={os.environ.get('QT_OPENGL')}", file=sys.stderr)
-    print(f"DISPLAY={os.environ.get('DISPLAY', 'NOT SET')}", file=sys.stderr)
-    
-    app = QApplication(sys.argv)
+
+    args = _parse_args(argv)
+
+    from ..logging_config import configure_logging, get_logger
+
+    configure_logging(level=args.log_level, log_file=args.log_file)
+    log = get_logger(__name__)
+
+    # Platform selection must happen before QApplication is constructed.
+    # Respect the user's environment by default rather than forcing xcb; only
+    # apply an explicit --platform override or fall back to xcb on X11 when the
+    # user has not expressed a preference and a display is present.
+    if args.platform:
+        os.environ["QT_QPA_PLATFORM"] = args.platform
+    elif "QT_QPA_PLATFORM" not in os.environ and os.environ.get("DISPLAY"):
+        # Prefer desktop GL on X11; this is the historically tested path.
+        os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+    os.environ.setdefault("QT_OPENGL", "desktop")
+
+    log.debug("QT_QPA_PLATFORM=%s", os.environ.get("QT_QPA_PLATFORM", "<auto>"))
+    log.debug("QT_OPENGL=%s", os.environ.get("QT_OPENGL", "<auto>"))
+    log.debug("DISPLAY=%s", os.environ.get("DISPLAY", "<unset>"))
+
+    app = QApplication(sys.argv[:1])
     app.setApplicationName("xStage")
     app.setOrganizationName("xStage")
     
@@ -4256,25 +4308,26 @@ def main():
     
     # Verify platform after QApplication creation
     platform_name = app.platformName()
-    print(f"Qt is using platform: {platform_name}", file=sys.stderr)
-    
-    if platform_name != 'xcb':
-        print(f"WARNING: Qt is using {platform_name} instead of xcb!", file=sys.stderr)
-        print("This may cause OpenGL context creation failures.", file=sys.stderr)
-    
+    log.info("Qt platform: %s", platform_name)
+
     try:
         window = USDViewerWindow()
         window.show()
+        if args.usd_file:
+            usd_path = os.path.abspath(os.path.expanduser(args.usd_file))
+            if os.path.exists(usd_path):
+                log.info("Opening %s", usd_path)
+                window.load_usd_file(usd_path)
+            else:
+                log.error("File not found: %s", usd_path)
         sys.exit(app.exec())
-    except Exception as e:
-        print(f"Error starting application: {e}", file=sys.stderr)
-        print("\nTroubleshooting tips:", file=sys.stderr)
-        print("1. Ensure you have proper graphics drivers installed", file=sys.stderr)
-        print("2. Check that X11 is running: echo $DISPLAY", file=sys.stderr)
-        print("3. Install OpenGL libraries: sudo dnf install mesa-libGL mesa-libGLU mesa-libEGL", file=sys.stderr)
-        print("4. Install xcb libraries: sudo dnf install libxcb libxcb-devel", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
+    except Exception:
+        log.exception("Error starting application")
+        log.error(
+            "Troubleshooting: ensure graphics drivers and OpenGL/xcb libraries "
+            "are installed (e.g. 'sudo dnf install mesa-libGL mesa-libGLU "
+            "mesa-libEGL libxcb'), and that a display is available ($DISPLAY)."
+        )
         sys.exit(1)
 
 

@@ -94,7 +94,7 @@ class ViewportWidget(QOpenGLWidget):
             from pxr import UsdImagingGL
             # Check if scene index is enabled (Hydra 2.0)
             return hasattr(UsdImagingGL, 'Engine')
-        except:
+        except Exception:
             return False
     
     def set_stage_manager(self, manager):

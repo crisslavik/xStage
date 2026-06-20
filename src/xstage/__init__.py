@@ -2,6 +2,8 @@
 xStage - Extended USD Viewer for Production Pipelines
 """
 
+__version__ = "0.1.0"
+
 # Core
 from .core import (
     USDViewerWindow,

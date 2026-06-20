@@ -72,7 +72,7 @@ class CacheManager:
             # Use mtime and size for quick hash
             content = f"{filepath}:{stat.st_mtime}:{stat.st_size}"
             return hashlib.md5(content.encode()).hexdigest()
-        except:
+        except Exception:
             return ""
     
     def _get_cache_key(self, cache_type: CacheType, identifier: str, 
@@ -103,7 +103,7 @@ class CacheManager:
                     self.geometry_cache[key] = data
                     self._update_access_time(key)
                     return data
-            except:
+            except Exception:
                 pass
         
         return None
@@ -227,7 +227,7 @@ class CacheManager:
                     data = json.load(f)
                     if data.get('file_hash') == file_hash:
                         cache_file.unlink()
-            except:
+            except Exception:
                 pass
     
     def get_cache_stats(self) -> Dict[str, Any]:
@@ -236,7 +236,7 @@ class CacheManager:
         for cache_file in self.cache_dir.glob("*.json"):
             try:
                 total_size += cache_file.stat().st_size
-            except:
+            except Exception:
                 pass
         
         return {
@@ -279,7 +279,7 @@ class CacheManager:
                     self.cache_metadata = {
                         k: CacheEntry(**v) for k, v in data.items()
                     }
-            except:
+            except Exception:
                 pass
     
     def save_metadata(self):

@@ -43,7 +43,7 @@ class CoordinateSystemManager:
                             'name': sys_name,
                             'prim_path': prim.GetPath().pathString,
                         })
-            except:
+            except Exception:
                 pass
             
             return coord_systems

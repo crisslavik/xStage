@@ -187,7 +187,7 @@ class PrimPropertiesWidget(QWidget):
                             if attr.HasAuthoredValue():
                                 value = attr.Get()
                                 attrs_text += f"\n{attr_name}: {value} ({attr.GetTypeName()})"
-                    except:
+                    except Exception:
                         pass
                 
                 # Show extent if it can be computed
@@ -204,7 +204,7 @@ class PrimPropertiesWidget(QWidget):
                     if attr.HasAuthoredValue():
                         value = attr.Get()
                         attrs_text += f"\n{attr.GetName()}: {value} ({attr.GetTypeName()})"
-                except:
+                except Exception:
                     pass
         
         self.attributes_text.setText(attrs_text)

@@ -51,7 +51,7 @@ class RecentFilesManager:
                     root_prim = stage.GetDefaultPrim()
                     if root_prim:
                         stage_name = root_prim.GetName()
-            except:
+            except Exception:
                 pass
         
         # Add to front

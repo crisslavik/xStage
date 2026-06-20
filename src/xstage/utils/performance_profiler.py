@@ -68,7 +68,7 @@ class PerformanceProfiler:
                 stage = Usd.Stage.Open(filepath)
                 elapsed = self.end_timer("stage_load")
                 return elapsed
-            except:
+            except Exception:
                 self.end_timer("stage_load")
                 return 0.0
         return 0.0
@@ -91,7 +91,7 @@ class PerformanceProfiler:
             
             elapsed = self.end_timer("geometry_extraction")
             return elapsed
-        except:
+        except Exception:
             self.end_timer("geometry_extraction")
             return 0.0
     

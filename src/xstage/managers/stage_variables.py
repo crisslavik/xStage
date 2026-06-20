@@ -47,7 +47,7 @@ class StageVariableManager:
                     if key.startswith('stageVariables') or key == 'stageVariables':
                         if isinstance(value, dict):
                             variables.update(value)
-        except:
+        except Exception:
             pass
         
         return variables

@@ -72,7 +72,7 @@ class AdobePluginInstaller:
             registry = Plug.Registry()
             fbx_plugin = registry.GetPluginWithName('usdFbx')
             return fbx_plugin is not None and fbx_plugin.isLoaded
-        except:
+        except Exception:
             return False
     
     def setup_plugin_path(self):
@@ -277,7 +277,7 @@ class AdobePluginInstaller:
                 if (parent / "lib" / "libusd.so").exists() or \
                    (parent / "lib" / "libusd.dylib").exists():
                     return str(parent)
-        except:
+        except Exception:
             pass
         
         return None

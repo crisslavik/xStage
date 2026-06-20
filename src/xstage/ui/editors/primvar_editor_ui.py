@@ -158,7 +158,7 @@ class PrimvarEditorWidget(QWidget):
                 else:
                     values_str = str(values)
                 self.values_text.setText(values_str)
-        except:
+        except Exception:
             self.values_text.clear()
     
     def on_property_changed(self):

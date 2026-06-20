@@ -381,7 +381,7 @@ class USDConverter:
                 if not alembic_plugin.isLoaded:
                     try:
                         alembic_plugin.Load()
-                    except:
+                    except Exception:
                         pass
                 return alembic_plugin.isLoaded
             
@@ -649,7 +649,7 @@ class USDConverter:
                         value = attr.Get(time_code)
                         dest_attr = dest_prim.CreateAttribute(attr.GetName(), attr.GetTypeName())
                         dest_attr.Set(value)
-                    except:
+                    except Exception:
                         pass
             
             # Copy relationships
