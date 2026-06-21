@@ -50,7 +50,7 @@ class Annotation:
 class AnnotationManager:
     """Manages scene annotations"""
     
-    def __init__(self, stage: Optional[Usd.Stage] = None):
+    def __init__(self, stage: "Optional[Usd.Stage]" = None):
         self.stage = stage
         self.annotations: List[Annotation] = []
         self.next_id = 1

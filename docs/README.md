@@ -54,7 +54,3 @@ docs/
 - **USD Updates**: `strategic/USD_UPDATE_MAINTAINABILITY.md`
 - **Implementation Plans**: `implementation/`
 
-## 📚 Complete Documentation Index
-
-For a complete list of all documentation files, see the root `DOCUMENTATION_INDEX.md`.
-

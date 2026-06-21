@@ -8,8 +8,11 @@ build/
 dist/
 *.egg-info/
 venv/
+.venv/
 env/
 .xstage_venv/
+.xstage_usd/
+.xstage_usd_build/
 .xstage_python/
 .python_build/
 

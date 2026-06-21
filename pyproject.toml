@@ -44,7 +44,7 @@ Repository = "https://github.com/xstage-pipeline/xstage"
 Issues = "https://github.com/xstage-pipeline/xstage/issues"
 
 [project.scripts]
-xstage = "xstage.core.viewer:main"
+xstage = "xstage._cli:main"
 
 [project.optional-dependencies]
 dev = [

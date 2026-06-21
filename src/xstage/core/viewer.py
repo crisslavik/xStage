@@ -682,14 +682,6 @@ class ViewportWidget(QOpenGLWidget):
     """OpenGL viewport for USD rendering"""
     
     def __init__(self, parent=None):
-        # Configure OpenGL format for compatibility profile (supports deprecated functions)
-        fmt = QSurfaceFormat()
-        fmt.setVersion(2, 1)  # OpenGL 2.1 for compatibility
-        fmt.setProfile(QSurfaceFormat.CompatibilityProfile)
-        fmt.setDepthBufferSize(24)
-        fmt.setSamples(4)  # 4x MSAA
-        QSurfaceFormat.setDefaultFormat(fmt)
-        
         super().__init__(parent)
         self.stage_manager = None
         self.geometry_data = {}
@@ -797,7 +789,11 @@ class ViewportWidget(QOpenGLWidget):
         self.home_camera_distance = self.camera_distance
         self.home_camera_target = center.copy()
         
-        print(f"DEBUG: Framed camera. Target: {self.camera_target}, Distance: {self.camera_distance:.2f}, Size: {max_size:.2f}, UpAxis: {up_axis}, MetersPerUnit: {meters_per_unit}")
+        import logging as _logging
+        _logging.getLogger("xstage.core.viewer").debug(
+            "Camera framed: target=%s distance=%.2f size=%.2f up=%s mpu=%s",
+            self.camera_target, self.camera_distance, max_size, up_axis, meters_per_unit,
+        )
         self.update()
     
     def frame_selected(self):
@@ -1172,16 +1168,14 @@ class ViewportWidget(QOpenGLWidget):
             glPopMatrix()
             
             # Only log mesh count occasionally
-            import time
-            current_time = int(time.time() * 1000)  # milliseconds
-            if not hasattr(self, '_last_mesh_count_print') or current_time - self._last_mesh_count_print > 2000:
-                print(f"DEBUG: Drew {mesh_count} meshes")
-                self._last_mesh_count_print = current_time
-            
+            import logging as _logging
+            _logging.getLogger("xstage.core.viewer").debug("Drew %d meshes", mesh_count)
+
             glDisable(GL_COLOR_MATERIAL)
-            
+
         except Exception as e:
-            print(f"ERROR in draw_geometry: {e}")
+            import logging as _logging
+            _logging.getLogger("xstage.core.viewer").error("draw_geometry: %s", e)
             import traceback
             traceback.print_exc()
     
@@ -1707,22 +1701,25 @@ class USDViewerWindow(QMainWindow):
         
         try:
             from ..rendering.hydra_viewport import HydraViewportWidget
-            # Check if CameraUtil.Frustum is available (indicates full imaging support)
-            from pxr import CameraUtil
-            if not hasattr(CameraUtil, 'Frustum'):
-                raise ImportError("CameraUtil.Frustum not available - need USD built from source")
-            
+            # Verify the imaging-capable USD build is loaded (not the headless pip package).
+            # CameraUtil.Frustum was removed in USD 25.x; the correct check is UsdImagingGL.Engine.
+            from pxr import UsdImagingGL, Gf
+            if not hasattr(UsdImagingGL, 'Engine'):
+                raise ImportError("UsdImagingGL.Engine not available — need USD built with imaging")
+            if not hasattr(Gf, 'Frustum'):
+                raise ImportError("Gf.Frustum not available — need USD built with imaging")
+
             # Use Hydra/Storm as PRIMARY renderer (like USDView)
             self.hydra_viewport = HydraViewportWidget(self)
             self.hydra_viewport.set_stage_manager(self.stage_manager)
             viewport_layout.addWidget(self.hydra_viewport)
             self.use_hydra = True
-            print("✅ Using Hydra 2.0 / Storm renderer (like USDView)")
-            self.statusBar().showMessage("Hydra 2.0 / Storm renderer active", 3000)
-            
+            print("✅ Using Hydra / Storm renderer (like USDView)")
+            self.statusBar().showMessage("Hydra / Storm renderer active", 3000)
+
         except (ImportError, Exception) as e:
-            # Hydra not available - fall back to basic OpenGL
-            print(f"ℹ️  Hydra 2.0 not available: {e}")
+            # Hydra not available — fall back to basic OpenGL
+            print(f"ℹ️  Hydra not available: {e}")
             print("   Falling back to basic OpenGL rendering")
             self.hydra_viewport = None
             self.viewport = ViewportWidget()
@@ -2429,27 +2426,50 @@ class USDViewerWindow(QMainWindow):
             self.fps_spinbox.setValue(int(self.stage_manager.fps))
             
             # Update viewport
-            print(f"DEBUG: Loading USD file. use_hydra={self.use_hydra}, has_hydra_viewport={bool(self.hydra_viewport)}")
-            print(f"DEBUG: Stage loaded: {self.stage_manager.stage is not None}")
-            print(f"DEBUG: Current time: {self.stage_manager.current_time}")
-            
-            # Ensure viewport has stage_manager set
-            if not self.viewport.stage_manager:
-                print("DEBUG: Setting stage_manager on viewport")
-                self.viewport.set_stage_manager(self.stage_manager)
-            
-            if self.use_hydra and self.hydra_viewport:
-                print("DEBUG: Using Hydra viewport")
+            from ..logging_config import get_logger as _get_logger
+            _log = _get_logger(__name__)
+            _log.debug(
+                "load_usd_file: use_hydra=%s hydra_viewport=%s stage=%s time=%s",
+                self.use_hydra,
+                bool(self.hydra_viewport),
+                self.stage_manager.stage is not None,
+                self.stage_manager.current_time,
+            )
+            _log.debug(
+                "Scene stats: meshes=%d cameras=%d lights=%d materials=%d",
+                len(geometry_data.get("meshes", [])),
+                len(geometry_data.get("cameras", [])),
+                len(geometry_data.get("lights", [])),
+                len(geometry_data.get("materials", [])),
+            )
+
+            # Hydra engine may have failed to initialize even though the widget
+            # was created (e.g. plugin ABI mismatch).  Check the engine attr.
+            hydra_ready = (
+                self.use_hydra
+                and self.hydra_viewport is not None
+                and getattr(self.hydra_viewport, "engine", None) is not None
+            )
+
+            if hydra_ready:
+                _log.debug("Routing to Hydra viewport")
                 if not self.hydra_viewport.stage_manager:
                     self.hydra_viewport.set_stage_manager(self.stage_manager)
                 self.hydra_viewport.set_stage(self.stage_manager.stage)
                 self.hydra_viewport.update_geometry(float(start))
-            else:
-                print("DEBUG: Using OpenGL viewport")
-                print(f"DEBUG: Viewport stage_manager: {self.viewport.stage_manager is not None}")
+            elif self.viewport is not None:
+                # Ensure OpenGL viewport has stage_manager set
+                if not self.viewport.stage_manager:
+                    _log.debug("Setting stage_manager on OpenGL viewport")
+                    self.viewport.set_stage_manager(self.stage_manager)
+                _log.debug(
+                    "Routing to basic OpenGL viewport (stage_manager present: %s)",
+                    self.viewport.stage_manager is not None,
+                )
                 self.viewport.update_geometry(float(start))
-                # Use QTimer for safer update instead of immediate update()
                 QTimer.singleShot(100, self.viewport.update)
+            else:
+                _log.warning("No viewport available to display scene")
             
             # Update hierarchy
             self.update_hierarchy()
@@ -3024,7 +3044,7 @@ class USDViewerWindow(QMainWindow):
         
     def import_convert_file(self):
         """Import and convert 3D file to USD"""
-        from ..converters.converter_ui import ConverterDialog
+        from ..ui.editors.converter_ui import ConverterDialog
         dialog = ConverterDialog(self)
         if dialog.exec():
             output_path = dialog.output_path_edit.text()
@@ -4231,7 +4251,68 @@ def _parse_args(argv=None):
         help="Override the Qt platform plugin (e.g. xcb, wayland, offscreen). "
         "By default xStage respects $QT_QPA_PLATFORM and lets Qt auto-detect.",
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=False,
+        help="Enable verbose diagnostic output (implies --log-level DEBUG).",
+    )
     return parser.parse_args(argv)
+
+
+def _print_startup_diagnostics(log) -> None:
+    """Emit startup environment info.
+
+    The wrong-pxr warning is always emitted at WARNING level so it surfaces
+    without --verbose.  Everything else is DEBUG-only.
+    """
+    import logging as _logging
+    import os
+    import sys
+
+    try:
+        import pxr
+        from pxr import Usd
+        pxr_path = os.path.dirname(pxr.__file__)
+        usd_ver = ".".join(str(v) for v in Usd.GetVersion())
+
+        # Detect headless pip install (lacks imaging .so files).
+        is_pip_headless = (
+            "site-packages" in pxr_path
+            and ".xstage_usd" not in pxr_path
+        )
+        if is_pip_headless:
+            log.warning(
+                "pxr loaded from pip (headless) at %s — Hydra/Storm unavailable. "
+                "Run: .venv/bin/xstage  or  ./launch_usd_viewer.sh",
+                pxr_path,
+            )
+
+        # Full diagnostics only at DEBUG level.
+        if not log.isEnabledFor(_logging.DEBUG):
+            return
+
+        log.debug("=== xStage Startup Diagnostics ===")
+        log.debug("  Python:            %s  (%s)", sys.version.split()[0], sys.executable)
+        log.debug("  pxr path:          %s", pxr_path)
+        log.debug("  USD version:       %s", usd_ver)
+
+        for mod_name in ("CameraUtil", "UsdImagingGL", "UsdAppUtils"):
+            try:
+                __import__(f"pxr.{mod_name}")
+                log.debug("  %-18s YES", mod_name + ":")
+            except ImportError:
+                log.debug("  %-18s NO  (imaging disabled)", mod_name + ":")
+
+        env_ready = os.environ.get("XSTAGE_ENV_READY", "<not set>")
+        log.debug("  XSTAGE_ENV_READY:  %s", env_ready)
+        log.debug("  LD_LIBRARY_PATH:   %s", os.environ.get("LD_LIBRARY_PATH", "<not set>"))
+        log.debug("  PYTHONPATH:        %s", os.environ.get("PYTHONPATH", "<not set>"))
+        log.debug("===================================")
+
+    except Exception as exc:
+        log.debug("Startup diagnostics failed: %s", exc)
 
 
 def main(argv=None):
@@ -4240,10 +4321,16 @@ def main(argv=None):
 
     args = _parse_args(argv)
 
+    # --verbose is a convenience alias for --log-level DEBUG.
+    if args.verbose and args.log_level is None:
+        args.log_level = "DEBUG"
+
     from ..logging_config import configure_logging, get_logger
 
     configure_logging(level=args.log_level, log_file=args.log_file)
     log = get_logger(__name__)
+
+    _print_startup_diagnostics(log)
 
     # Platform selection must happen before QApplication is constructed.
     # Respect the user's environment by default rather than forcing xcb; only

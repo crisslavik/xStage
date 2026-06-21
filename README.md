@@ -342,7 +342,7 @@ for f in files:
 
 - **[Feature List](docs/ADDED_FEATURES.md)** - All implemented features
 - **[Future Features](docs/FUTURE_FEATURES.md)** - Planned enhancements
-- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation guide
+- **[Setup Guide](SETUP_GUIDE.md)** - Installation and configuration
 - **[Platform Support](docs/platform-support.md)** - Installation by platform
 - **[Material Support](docs/materialx-support.md)** - MaterialX and shader support
 

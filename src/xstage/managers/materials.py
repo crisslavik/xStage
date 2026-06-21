@@ -40,7 +40,7 @@ class MaterialManager:
             surface_output = material.GetSurfaceOutput()
             if surface_output:
                 material_data['surface_output'] = {
-                    'path': surface_output.GetPath(),
+                    'path': surface_output.GetAttr().GetPath(),
                     'type': str(surface_output.GetTypeName()),
                 }
                 # Get connected source
@@ -59,15 +59,15 @@ class MaterialManager:
             displacement_output = material.GetDisplacementOutput()
             if displacement_output:
                 material_data['displacement_output'] = {
-                    'path': displacement_output.GetPath(),
+                    'path': displacement_output.GetAttr().GetPath(),
                     'type': str(displacement_output.GetTypeName()),
                 }
-            
+
             # Get volume output
             volume_output = material.GetVolumeOutput()
             if volume_output:
                 material_data['volume_output'] = {
-                    'path': volume_output.GetPath(),
+                    'path': volume_output.GetAttr().GetPath(),
                     'type': str(volume_output.GetTypeName()),
                 }
             

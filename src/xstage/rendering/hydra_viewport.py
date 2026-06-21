@@ -1,14 +1,17 @@
 """
-Hydra 2.0 Viewport Implementation
-Uses UsdImagingGL for high-performance USD rendering
-Based on OpenUSD 25.11 Hydra 2.0 specifications
+Hydra Viewport Implementation
+Uses UsdImagingGL (Storm) for high-performance USD rendering, configured to
+mirror usdview's setup (OpenUSD 25.11).
 """
 
+import logging
+
 import numpy as np
-from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QOpenGLContext, QSurfaceFormat
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
+
+log = logging.getLogger("xstage.rendering.hydra_viewport")
 
 # Import OpenGL for clearing and basic operations
 try:
@@ -16,19 +19,15 @@ try:
     OPENGL_AVAILABLE = True
 except ImportError:
     OPENGL_AVAILABLE = False
-    print("Warning: PyOpenGL not available")
+    log.warning("PyOpenGL not available")
 
 try:
-    from pxr import Usd, UsdGeom, Gf, UsdImagingGL, Glf, CameraUtil
+    from pxr import Usd, UsdGeom, Gf, UsdImagingGL, Glf
     USD_AVAILABLE = True
-    # Check if Orthographic is available (may not be in all USD versions)
-    ORTHOGRAPHIC_AVAILABLE = hasattr(CameraUtil, 'Orthographic')
 except ImportError:
     USD_AVAILABLE = False
     UsdImagingGL = None
     Glf = None
-    CameraUtil = None
-    ORTHOGRAPHIC_AVAILABLE = False
 
 
 class HydraViewportWidget(QOpenGLWidget):
@@ -42,10 +41,14 @@ class HydraViewportWidget(QOpenGLWidget):
         self.stage_manager = None
         self.stage = None
         self.current_time = 0.0
-        
+
+        # True when the stage's up-axis is Z (default in many DCCs).  usdview
+        # detects this with UsdGeom.GetStageUpAxis and rotates the camera so
+        # the scene appears upright; we do the same in _compute_camera_matrices.
+        self.is_z_up = False
+
         # Hydra components
         self.engine = None
-        self.renderer = None
         self.render_params = None
         
         # Camera controls
@@ -85,95 +88,76 @@ class HydraViewportWidget(QOpenGLWidget):
         self._setup_opengl_context()
     
     def _setup_opengl_context(self):
-        """Configure OpenGL context for Hydra"""
-        format = QSurfaceFormat()
-        format.setVersion(4, 5)  # OpenGL 4.5 required for Storm renderer
-        format.setProfile(QSurfaceFormat.CoreProfile)
-        format.setDepthBufferSize(24)
-        format.setStencilBufferSize(8)
-        format.setSamples(4)  # Multisampling
-        format.setSwapBehavior(QSurfaceFormat.DoubleBuffer)
-        QSurfaceFormat.setDefaultFormat(format)  # Set as default
-        self.setFormat(format)
+        """Configure the GL surface format exactly like usdview does.
+
+        usdview (the proven reference using this same USD build) creates a
+        plain QSurfaceFormat with only MSAA enabled — it does NOT request a
+        version or a Core profile.  On Linux this yields a high-version
+        Compatibility context that provides both the modern draw entry points
+        Storm needs (glDrawArraysInstancedBaseInstance, etc.) AND the legacy
+        fixed-function enums (GL_POINT_SMOOTH / GL_POINT_SPRITE) that Storm's
+        HgiGL unconditionally references.  Requesting a Core profile makes
+        those legacy enums illegal, which produces a cascade of GL errors and
+        a black viewport.
+        """
+        fmt = QSurfaceFormat()
+        fmt.setSamples(4)  # 4x MSAA, matching usdview's default
+        self.setFormat(fmt)
     
     def initializeGL(self):
-        """Initialize OpenGL and Hydra 2.0"""
+        """Initialize OpenGL and Hydra/Storm.
+
+        Qt already ensures the context is current when initializeGL() is called.
+        Do NOT call makeCurrent() here — it would try to make a context current
+        that's already current, which is harmless but confusing.
+        """
         if not USD_AVAILABLE:
             return
-        
+
         try:
-            # CRITICAL: Make OpenGL context current before any GL calls
-            self.makeCurrent()
-            
-            # Initialize GLF (GL Framework) - required for Storm
-            # Note: GlewInit is not available in pip-installed USD
+            # Initialize GLF (GL Framework) - required for Storm.
+            # GlewInit is not available in all builds (absent in pip usd-core).
             if Glf and hasattr(Glf, 'GlewInit'):
                 Glf.GlewInit()
-            elif Glf:
-                print("⚠️  Glf.GlewInit not available (pip-installed USD)")
-            
-            # CRITICAL: Enable Scene Index BEFORE creating engine (Hydra 2.0 requirement)
+
+            # Create Hydra engine.  SetEnableSceneIndex is a static/global
+            # setting in USD 25.11 that enables the Hydra 2 scene index path.
             try:
                 if hasattr(UsdImagingGL.Engine, 'SetEnableSceneIndex'):
                     UsdImagingGL.Engine.SetEnableSceneIndex(True)
-                    print("✅ Hydra 2.0 Scene Index enabled (static)")
-            except Exception as e:
-                print(f"⚠️  Scene Index enable failed: {e}")
-            
-            # Create Hydra engine AFTER enabling scene index
+            except Exception:
+                pass
+
             self.engine = UsdImagingGL.Engine()
-            
-            # CRITICAL: Set Storm renderer explicitly (Hydra 2.0 GPU renderer)
-            try:
-                available_renderers = self.engine.GetRendererPlugins()
-                print(f"Available renderers: {available_renderers}")
-                
-                if available_renderers:
-                    if 'HdStormRendererPlugin' in available_renderers:
-                        self.engine.SetRendererPlugin('HdStormRendererPlugin')
-                        print("✅ Storm renderer (Hydra 2.0 GPU) enabled")
-                    else:
-                        # Use first available renderer
-                        self.engine.SetRendererPlugin(available_renderers[0])
-                        print(f"✅ Using renderer: {available_renderers[0]}")
-                else:
-                    print("❌ No renderer plugins found - check USD installation")
-                    raise RuntimeError("No Hydra renderer plugins available")
-            except Exception as e:
-                print(f"❌ Renderer plugin selection failed: {e}")
-                raise
-            
-            # Get renderer (for verification)
-            try:
-                self.renderer = self.engine.GetRenderer()
-                current_renderer = self.engine.GetCurrentRendererId()
-                print(f"Current renderer: {current_renderer}")
-            except Exception as e:
-                print(f"⚠️  Could not get renderer info: {e}")
-            
-            # Set render params
+
+            # Select the Storm GPU renderer explicitly.
+            available_renderers = self.engine.GetRendererPlugins()
+            log.debug("Available Hydra renderers: %s", available_renderers)
+            if not available_renderers:
+                raise RuntimeError("No Hydra renderer plugins available")
+            if 'HdStormRendererPlugin' in available_renderers:
+                self.engine.SetRendererPlugin('HdStormRendererPlugin')
+            else:
+                self.engine.SetRendererPlugin(available_renderers[0])
+            log.info("Hydra/Storm renderer: %s", self.engine.GetCurrentRendererId())
+
+            # Render params (mirrors usdview's defaults).
             self.render_params = UsdImagingGL.RenderParams()
             self.render_params.frame = self.current_time
             self.render_params.complexity = 1.0
             self.render_params.drawMode = UsdImagingGL.DrawMode.DRAW_SHADED_SMOOTH
             self.render_params.enableLighting = True
             self.render_params.enableIdRender = False
-            self.render_params.enableSampleAlphaToCoverage = True  # Better transparency
+            self.render_params.enableSampleAlphaToCoverage = True
             self.render_params.highlight = False
             self.render_params.cullStyle = UsdImagingGL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
             self.render_params.showGuides = False
             self.render_params.showProxy = True
             self.render_params.showRender = False
-            
-            # Set background color
             self.render_params.clearColor = self.background_color
-            
-            print("✅ Hydra engine initialized successfully")
-            
+
         except Exception as e:
-            print(f"❌ Error initializing Hydra: {e}")
-            import traceback
-            traceback.print_exc()
+            log.error("Error initializing Hydra: %s", e, exc_info=True)
             self.engine = None
     
     def resizeGL(self, w, h):
@@ -185,59 +169,81 @@ class HydraViewportWidget(QOpenGLWidget):
         self.engine.SetRenderViewport(Gf.Vec4d(0, 0, w, h))
     
     def paintGL(self):
-        """Render using Hydra 2.0"""
+        """Render using Hydra/Storm.
+
+        The GL state setup here mirrors usdview's _paintGLWithRenderer():
+        clear the widget's framebuffer, enable depth test and alpha blending,
+        then let the engine render and composite into it.  Qt makes the
+        context current before paintGL, so makeCurrent() is not needed.
+        """
         if not USD_AVAILABLE or not self.engine or not self.stage:
             return
-        
+
         try:
-            # Make context current
-            self.makeCurrent()
-            
-            # Clear
             if OPENGL_AVAILABLE:
                 glClearColor(
                     self.background_color[0],
                     self.background_color[1],
                     self.background_color[2],
-                    self.background_color[3]
+                    self.background_color[3],
                 )
+                glEnable(GL_DEPTH_TEST)
+                glDepthFunc(GL_LESS)
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+                glEnable(GL_BLEND)
+                glDepthMask(GL_TRUE)
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-            
-            # Set viewport size - USD 25.11+ uses GfVec4d(x, y, width, height)
+
             width = self.width()
             height = self.height()
             self.engine.SetRenderViewport(Gf.Vec4d(0, 0, width, height))
-            
-            # Compute camera matrices
+
             view_matrix, projection_matrix = self._compute_camera_matrices()
-            
-            # CRITICAL: Set camera state (Hydra 2.0 requirement)
-            try:
-                self.engine.SetCameraState(view_matrix, projection_matrix)
-            except Exception as e:
-                print(f"⚠️  SetCameraState failed (may use legacy API): {e}")
-                # Fallback to legacy matrix multiplication
-                camera_matrix = projection_matrix * view_matrix
-            
-            # Set render params
+            self.engine.SetCameraState(view_matrix, projection_matrix)
+
+            # Without lights Storm renders all geometry black.  usdview enables
+            # a camera headlight by default (cameraLightEnabled=True); mirror it.
+            self._set_lighting(view_matrix)
+
             self.render_params.frame = Usd.TimeCode(self.current_time)
-            
-            # Render root prim
+
             root_prim = self.stage.GetPseudoRoot()
-            
-            # Try new API first (Hydra 2.0)
-            try:
-                self.engine.Render(root_prim, self.render_params)
-            except TypeError:
-                # Fallback to legacy API with matrix
-                camera_matrix = projection_matrix * view_matrix
-                self.engine.Render(root_prim, self.render_params, camera_matrix)
-            
+            self.engine.Render(root_prim, self.render_params)
+
         except Exception as e:
-            print(f"❌ Error rendering with Hydra: {e}")
-            import traceback
-            traceback.print_exc()
+            log.error("Error rendering with Hydra: %s", e, exc_info=True)
     
+    def _set_lighting(self, view_matrix):
+        """Set a camera headlight + default material, mirroring usdview.
+
+        usdview places a SimpleLight at the camera with the view-inverse as its
+        transform and a default material (ambient 0.2, specular 0.1), plus a
+        small scene ambient.  Without this, Storm draws every surface black.
+        """
+        if Glf is None:
+            return
+        try:
+            view_inverse = view_matrix.GetInverse()
+            cam_pos = view_inverse.ExtractTranslation()
+
+            light = Glf.SimpleLight()
+            light.ambient = Gf.Vec4f(0, 0, 0, 0)
+            light.position = Gf.Vec4f(
+                float(cam_pos[0]), float(cam_pos[1]), float(cam_pos[2]), 1.0
+            )
+            light.transform = view_inverse
+
+            material = Glf.SimpleMaterial()
+            kA, kS = 0.2, 0.1  # usdview DEFAULT_AMBIENT / DEFAULT_SPECULAR
+            material.ambient = Gf.Vec4f(kA, kA, kA, 1.0)
+            material.specular = Gf.Vec4f(kS, kS, kS, 1.0)
+            material.shininess = 32.0
+
+            scene_ambient = Gf.Vec4f(0.01, 0.01, 0.01, 1.0)
+            self.engine.SetLightingState([light], material, scene_ambient)
+        except Exception as e:
+            log.warning("Could not set lighting state: %s", e)
+
     def _compute_camera_matrices(self):
         """Compute camera view and projection matrices (separate for Hydra 2.0)"""
         aspect = self.width() / max(self.height(), 1)
@@ -309,73 +315,71 @@ class HydraViewportWidget(QOpenGLWidget):
             up_vector = Gf.Vec3d(0, 1, 0)
         
         # Create view matrix
-        view_matrix = Gf.Matrix4d()
-        view_matrix.SetLookAt(
-            camera_pos,
-            Gf.Vec3d(self.camera_target[0], self.camera_target[1], self.camera_target[2]),
-            up_vector
+        # The per-view math above is expressed in a Y-up convention.  For a
+        # Z-up stage, rotate the camera offset and up vector by +90° about X
+        # (Y-up -> Z-up), the same correction usdview applies via
+        # Gf.Camera.Y_UP_TO_Z_UP_MATRIX, so the scene appears upright.
+        target = Gf.Vec3d(
+            self.camera_target[0], self.camera_target[1], self.camera_target[2]
         )
-        
-        # Create projection matrix
-        if view_mode == "Perspective":
-            # Perspective projection
-            projection_matrix = CameraUtil.Frustum(
-                -self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)) * aspect,
-                self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)) * aspect,
-                -self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)),
-                self.near_clip * np.tan(np.radians(self.camera_fov / 2.0)),
-                self.near_clip,
-                self.far_clip
+        if self.is_z_up:
+            y_up_to_z_up = Gf.Matrix4d().SetRotate(
+                Gf.Rotation(Gf.Vec3d.XAxis(), 90)
             )
+            offset = y_up_to_z_up.TransformDir(camera_pos - target)
+            camera_pos = target + offset
+            up_vector = y_up_to_z_up.TransformDir(up_vector)
+
+        view_matrix = Gf.Matrix4d()
+        view_matrix.SetLookAt(camera_pos, target, up_vector)
+        
+        # Create projection matrix using Gf.Frustum — the same API USDView uses.
+        # CameraUtil.Frustum is Gf.Frustum (re-exported); calling it with 6
+        # plain floats was using a non-existent overload and raised TypeError
+        # every frame (silently swallowed by paintGL's except clause).
+        if view_mode == "Perspective":
+            frustum = Gf.Frustum()
+            frustum.SetPerspective(self.camera_fov, True, aspect, self.near_clip, self.far_clip)
+            projection_matrix = frustum.ComputeProjectionMatrix()
         else:
-            # Orthographic projection for ortho views
             ortho_size = self.camera_distance * 0.5
-            if ORTHOGRAPHIC_AVAILABLE and hasattr(CameraUtil, 'Orthographic'):
-                projection_matrix = CameraUtil.Orthographic(
-                    -ortho_size * aspect,
-                    ortho_size * aspect,
-                    -ortho_size,
-                    ortho_size,
-                    self.near_clip,
-                    self.far_clip
-                )
-            else:
-                # Fallback: create orthographic matrix manually
-                # Orthographic: left, right, bottom, top, near, far
-                left = -ortho_size * aspect
-                right = ortho_size * aspect
-                bottom = -ortho_size
-                top = ortho_size
-                near = self.near_clip
-                far = self.far_clip
-                
-                # Create orthographic projection matrix
-                projection_matrix = Gf.Matrix4d()
-                projection_matrix[0][0] = 2.0 / (right - left)
-                projection_matrix[1][1] = 2.0 / (top - bottom)
-                projection_matrix[2][2] = -2.0 / (far - near)
-                projection_matrix[3][0] = -(right + left) / (right - left)
-                projection_matrix[3][1] = -(top + bottom) / (top - bottom)
-                projection_matrix[3][2] = -(far + near) / (far - near)
-                projection_matrix[3][3] = 1.0
+            left = -ortho_size * aspect
+            right = ortho_size * aspect
+            bottom = -ortho_size
+            top = ortho_size
+            near = self.near_clip
+            far = self.far_clip
+            frustum = Gf.Frustum()
+            frustum.SetOrthographic(left, right, bottom, top, near, far)
+            projection_matrix = frustum.ComputeProjectionMatrix()
         
         return view_matrix, projection_matrix
     
+    def _update_up_axis(self):
+        """Detect the stage up-axis (matches usdview's UsdGeom.GetStageUpAxis)."""
+        if self.stage:
+            self.is_z_up = (
+                UsdGeom.GetStageUpAxis(self.stage) == UsdGeom.Tokens.z
+            )
+
     def set_stage_manager(self, manager):
         """Set the USD stage manager"""
         self.stage_manager = manager
         if manager and manager.stage:
             self.stage = manager.stage
-    
+            self._update_up_axis()
+
     def set_stage(self, stage):
         """Set the USD stage directly"""
         self.stage = stage
-    
+        self._update_up_axis()
+
     def update_geometry(self, time_code: float):
         """Update geometry for current time"""
         self.current_time = time_code
         if self.stage_manager:
             self.stage = self.stage_manager.stage
+            self._update_up_axis()
         self.update()
     
     def frame_bounds(self, bounds: dict):
